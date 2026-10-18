@@ -1,0 +1,46 @@
+From: Hampus Hellsberg <hampushellsberg@gmail.com>
+Subject: [PATCH] setup: make smpp.twisted3 an extra, only pySim-smpp2sim.py needs it
+
+smpp.twisted3 is imported by pySim-smpp2sim.py alone; no module under
+pySim/ uses it. Every release of smpp.twisted3 pins Twisted~=23.10.0,
+a Twisted with three open advisories (CVE-2026-42304, CVE-2024-41810,
+CVE-2024-41671), so every installation of the library carries a Twisted
+it never loads and cannot upgrade. Move the requirement to a
+`smpp2sim` extra; the script keeps working with `pip install
+"pysim[smpp2sim]"` and fails with a plain ImportError without it, the
+same way the `smdpp` extra behaves for klein.
+---
+ requirements.txt | 1 -
+ setup.py         | 4 +++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/requirements.txt b/requirements.txt
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -14,5 +14,4 @@
+ git+https://github.com/osmocom/asn1tools
+ packaging
+ git+https://github.com/hologram-io/smpp.pdu
+-smpp.twisted3 @ git+https://github.com/jookies/smpp.twisted
+ smpplib
+diff --git a/setup.py b/setup.py
+--- a/setup.py
++++ b/setup.py
+@@ -33,7 +33,6 @@ setup(
+         "packaging",
+         "smpp.pdu @ git+https://github.com/hologram-io/smpp.pdu",
+         "asn1tools",
+-        "smpp.twisted3 @ git+https://github.com/jookies/smpp.twisted",
+     ],
+     scripts=[
+         'pySim-prog.py',
+@@ -57,7 +56,10 @@ setup(
+             "requests",
+             "smpplib",
+         ],
++        "smpp2sim": [
++            "smpp.twisted3 @ git+https://github.com/jookies/smpp.twisted",
++        ],
+         "CardKeyProviderPgsql": [
+             "psycopg2-binary",
+         ]

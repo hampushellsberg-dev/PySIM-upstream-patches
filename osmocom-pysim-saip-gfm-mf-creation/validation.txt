@@ -1,0 +1,25 @@
+# python upstream_patches/osmocom-pysim-saip-gfm-mf-creation/repro_saip_gfm_mf_creation.py
+Traceback (most recent call last):
+  File "<YggdraSIM>/upstream_patches/osmocom-pysim-saip-gfm-mf-creation/repro_saip_gfm_mf_creation.py", line 86, in main
+    pes = ProfileElementSequence.from_der(der)
+  File "<venv>/lib/python3.13/site-packages/pySim/esim/saip/__init__.py", line 1746, in from_der
+    inst.parse_der(der)
+    ~~~~~~~~~~~~~~^^^^^
+  File "<venv>/lib/python3.13/site-packages/pySim/esim/saip/__init__.py", line 1619, in parse_der
+    self.pe_list.append(ProfileElement.from_der(first_tlv, pe_sequence=self))
+                        ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<venv>/lib/python3.13/site-packages/pySim/esim/saip/__init__.py", line 623, in from_der
+    inst._post_decode()
+    ~~~~~~~~~~~~~~~~~^^
+AttributeError: 'NoneType' object has no attribute 'lookup_by_fidpath'
+mode: upstream
+profile: 84 bytes; PE tags: a0 .. aa07
+FAIL
+
+# python upstream_patches/osmocom-pysim-saip-gfm-mf-creation/repro_saip_gfm_mf_creation.py --compensated
+mode: compensated
+profile: 84 bytes; PE tags: a0 .. aa07
+OK types: ['header', 'genericFileManagement', 'end']
+sequence.mf: FsNodeMF(3F00) children: ['2F06']
+gfm.files: ['3F00/2F06', '3F00/3F00']
+round trip byte-identical: True

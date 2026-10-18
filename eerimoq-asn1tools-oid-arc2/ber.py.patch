@@ -1,0 +1,16 @@
+--- a/asn1tools/codecs/ber.py
++++ b/asn1tools/codecs/ber.py
+@@ -438,7 +438,12 @@
+ def decode_object_identifier(data, offset, end_offset):
+     subidentifier, offset = decode_object_identifier_subidentifier(data,
+                                                                    offset)
+-    decoded = [subidentifier // 40, subidentifier % 40]
++    # X.690 8.19.4: arcs 0 and 1 have at most 39 sub-arcs, so a first
++    # subidentifier from 80 up is arc 2 with an unbounded second arc.
++    if subidentifier >= 80:
++        decoded = [2, subidentifier - 80]
++    else:
++        decoded = [subidentifier // 40, subidentifier % 40]
+ 
+     while offset < end_offset:
+         subidentifier, offset = decode_object_identifier_subidentifier(data,

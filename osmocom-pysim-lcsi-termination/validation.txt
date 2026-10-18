@@ -1,0 +1,59 @@
+=== BEFORE (upstream pySim, unpatched) ===
+decode, table 11.7b:
+  OK     '00' -> 'no_information'           expected 'no_information'
+  OK     '01' -> 'creation'                 expected 'creation'
+  OK     '03' -> 'initialization'           expected 'initialization'
+  OK     '04' -> 'operational_deactivated'  expected 'operational_deactivated'
+  OK     '06' -> 'operational_deactivated'  expected 'operational_deactivated'
+  OK     '05' -> 'operational_activated'    expected 'operational_activated'
+  OK     '07' -> 'operational_activated'    expected 'operational_activated'
+  WRONG  '0C' -> 'operational_deactivated'  expected 'termination'
+  WRONG  '0D' -> 'operational_activated'    expected 'termination'
+  WRONG  '0E' -> 'operational_deactivated'  expected 'termination'
+  WRONG  '0F' -> 'operational_activated'    expected 'termination'
+  WRONG  '15' -> 'operational_activated'    expected 21
+  OK     '12' -> 18                         expected 18
+  OK     '02' -> 2                          expected 2
+
+round trip of the termination state:
+  WRONG  'termination' -> 8a010c -> 'operational_deactivated'
+
+FAIL: 6 case(s) wrong: 0C, 0D, 0E, 0F, 15, round trip
+
+=== AFTER (same pySim with pysim-lcsi-termination.patch applied) ===
+decode, table 11.7b:
+  OK     '00' -> 'no_information'           expected 'no_information'
+  OK     '01' -> 'creation'                 expected 'creation'
+  OK     '03' -> 'initialization'           expected 'initialization'
+  OK     '04' -> 'operational_deactivated'  expected 'operational_deactivated'
+  OK     '06' -> 'operational_deactivated'  expected 'operational_deactivated'
+  OK     '05' -> 'operational_activated'    expected 'operational_activated'
+  OK     '07' -> 'operational_activated'    expected 'operational_activated'
+  OK     '0C' -> 'termination'              expected 'termination'
+  OK     '0D' -> 'termination'              expected 'termination'
+  OK     '0E' -> 'termination'              expected 'termination'
+  OK     '0F' -> 'termination'              expected 'termination'
+  OK     '15' -> 21                         expected 21
+  OK     '12' -> 18                         expected 18
+  OK     '02' -> 2                          expected 2
+
+round trip of the termination state:
+  OK     'termination' -> 8a010c -> 'termination'
+
+PASS: every value of table 11.7b decodes to its state.
+
+=== A whole FCP template, before and after ===
+Template: 62148202412183026F078A010C8B036F060280020009
+  (transparent EF '6F07', ARR reference, file size 9, LCSI '0C')
+
+  unpatched  life_cycle_status_integer = 'operational_deactivated'
+  patched    life_cycle_status_integer = 'termination'
+
+=== pySim's own de/encode vectors for the class, patched ===
+  de/encode ok: 8a0105 operational_activated
+  de/encode ok: 8a010c termination       (vector added by the patch)
+
+=== YggdraSIM's decoder, for comparison (unchanged by any of this) ===
+  SCP03.logic.fs._lcs_name(0x0C) = 'Termination state'
+  SCP03.logic.fs._lcs_name(0x0F) = 'Termination state'
+  SCP03.logic.fs._lcs_name(0x12) = 'Proprietary'

@@ -1,0 +1,32 @@
+--- a/asn1tools/codecs/compiler.py	2026-05-19 11:00:16.243610477 +0200
++++ b/asn1tools/codecs/compiler.py	2026-05-19 11:00:16.246610366 +0200
+@@ -695,8 +695,14 @@
+ 
+         """
+ 
++        seen = set()
+         try:
+             while True:
++                if type_name in seen:
++                    raise CompileError(
++                        "Circular type reference '{}' in module '{}'.".format(
++                            type_name, module_name))
++                seen.add(type_name)
+                 if is_object_class_type_name(type_name):
+                     type_name, module_name = self.lookup_object_class_type_name(
+                         type_name,
+@@ -714,8 +720,14 @@
+     def resolve_type_descriptor(self, type_descriptor, module_name):
+         type_name = type_descriptor['type']
+ 
++        seen = set()
+         try:
+             while True:
++                if type_name in seen:
++                    raise CompileError(
++                        "Circular type reference '{}' in module '{}'.".format(
++                            type_name, module_name))
++                seen.add(type_name)
+                 if is_object_class_type_name(type_name):
+                     type_name, module_name = self.lookup_object_class_type_name(
+                         type_name,

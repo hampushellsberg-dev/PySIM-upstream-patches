@@ -1,0 +1,270 @@
+diff --git a/pySim/esim/saip/__init__.py b/pySim/esim/saip/__init__.py
+--- a/pySim/esim/saip/__init__.py
++++ b/pySim/esim/saip/__init__.py
+@@ -99,11 +99,11 @@
+     aid = h2b("a0000000871002")
+     mandatory_services = ["usim"]
+     pe_types = ["usim", "opt-usim", "phonebook", "gsm-access", "eap", "df-5gs", "df-saip",
+-                "df-snpn", "df-5gprose"]
++                "df-snpn", "df-5gprose", "iot", "opt-iot"]
+     templates = [oid.ADF_USIM_by_default, oid.ADF_USIMopt_not_by_default,
+                  oid.DF_PHONEBOOK_ADF_USIM, oid.DF_GSM_ACCESS_ADF_USIM,
+                  oid.DF_EAP, oid.DF_5GS, oid.DF_SAIP, oid.DF_SNPN,
+-                 oid.DF_5GProSe]
++                 oid.DF_5GProSe, oid.IoT_by_default, oid.IoTopt_not_by_default]
+     adf = ADF_USIM()
+ 
+ class NaaIsim(Naa):
+@@ -574,11 +574,11 @@
+             'pinCodes': ProfileElementPin,
+             'pukCodes': ProfileElementPuk,
+             'akaParameter': ProfileElementAKA,
+-            # TODO: cdmaParameter
++            'cdmaParameter': ProfileElementCDMA,
+             'securityDomain': ProfileElementSD,
+             'rfm': ProfileElementRFM,
+             'application': ProfileElementApplication,
+-            # TODO: nonStandard
++            'nonStandard': ProfileElementNonStandard,
+             'end': ProfileElementEnd,
+             'mf': ProfileElementMF,
+             'cd': ProfileElementCD,
+@@ -596,6 +596,8 @@
+             'df-saip': ProfileElementDfSAIP,
+             'df-snpn': ProfileElementDfSNPN,
+             'df-5gprose': ProfileElementDf5GProSe,
++            'iot': ProfileElementIoT,
++            'opt-iot': ProfileElementOptIoT,
+             }
+         if pe_type in class4petype:
+             return class4petype[pe_type]
+@@ -1366,6 +1368,135 @@
+         # provide some reasonable defaults for a MNO-SD
+         self.decoded['templateID'] = str(oid.ADF_USIMopt_not_by_default_v2)
+ 
++class ProfileElementCDMA(ProfileElement):
++    """Class representing the ProfileElement for the CDMA parameters (PE-CDMAParameter)."""
++    type = 'cdmaParameter'
++
++class ProfileElementNonStandard(ProfileElement):
++    """Class representing a non-standard, issuer specific ProfileElement (PE-NonStandard)."""
++    type = 'nonStandard'
++
++class ProfileElementIoT(FsProfileElement):
++    """Class representing the ProfileElement for the IoT Minimal Profile mandatory files.  A single PE
++    creates the MF-level files and ADF.USIM (Section 8.3.4.8.1 and 9.10.1 of TCA SAIP V3.4.1)."""
++    type = 'iot'
++
++    def __init__(self, decoded: Optional[dict] = None, **kwargs):
++        super().__init__(decoded, **kwargs)
++        if decoded:
++            return
++        self.decoded['templateID'] = str(oid.IoT_by_default)
++        for fname in ['mf', 'ef-iccid', 'ef-dir', 'adf-usim', 'ef-imsi', 'ef-ust', 'ef-acc', 'ef-ecc']:
++            self.decoded[fname] = []
++
++    @property
++    def adf_name(self) -> str:
++        return b2h(self.decoded['adf-usim'][0][1]['dfName'])
++
++    @property
++    def imsi(self) -> Optional[str]:
++        template = templates.ProfileTemplateRegistry.get_by_oid(self.templateID)
++        f = File('ef-imsi', self.decoded['ef-imsi'], template.files_by_pename.get('ef-imsi', None))
++        return dec_imsi(b2h(f.body))
++
++    def file_template_for_path(self, path: Path, adf: Optional[str] = None) -> Optional[templates.FileTemplate]:
++        # the template spans the MF and ADF.USIM, so the paths of its files are absolute
++        template = templates.ProfileTemplateRegistry.get_by_oid(self.templateID)
++        for f in template.files:
++            if f.path == path or f.path.relative_to_mf() == path:
++                return f
++
++    def _root_template_mf(self):
++        """'mf' is OPTIONAL in PE-IoT: root the MF of the template so that ADF.USIM has a parent."""
++        template = templates.ProfileTemplateRegistry.get_by_oid(self.templateID)
++        mf = File('mf', None, template.files_by_pename['mf'])
++        if self.pe_sequence.mf:
++            self.files['mf'] = mf
++            mf.node = self.pe_sequence.mf
++            return
++        super().add_file(mf)
++
++    def add_file(self, file: File):
++        if self.pe_sequence and file.pe_name == 'mf' and self.pe_sequence.mf:
++            # the MF was created by a preceding PE-GenericFileManagement (Section 8.1): re-use it
++            if 'mf' in self.files:
++                raise KeyError('Cannot add file: mf already exists')
++            self.files['mf'] = file
++            file.node = self.pe_sequence.mf
++            return
++        if self.pe_sequence and file.pe_name != 'mf' and not 'mf' in self.files:
++            self._root_template_mf()
++        super().add_file(file)
++
++class ProfileElementOptIoT(FsProfileElement):
++    """Class representing the ProfileElement for the IoT Minimal Profile optional files below ADF.USIM,
++    including DF.5GS and DF.SAIP (Section 8.3.4.8.2 and 9.10.2 of TCA SAIP V3.4.1)."""
++    type = 'opt-iot'
++
++    def __init__(self, decoded: Optional[dict] = None, **kwargs):
++        super().__init__(decoded, **kwargs)
++        if decoded:
++            return
++        self.decoded['templateID'] = str(oid.IoTopt_not_by_default)
++
++    @staticmethod
++    def _relative_path(template: templates.ProfileTemplate, ft: templates.FileTemplate) -> Path:
++        """Path of a template row below ADF.USIM.  Follows the ppath of the row, as the template tree
++        cannot express two sibling DFs (DF.5GS, DF.SAIP) within one template."""
++        names = []
++        for fid in ft.ppath:
++            container = [c for c in template.files if c.fid == fid and c.file_type in ['MF', 'DF', 'ADF']]
++            names.append(container[0].name if container else '%04X' % fid)
++        names.append(ft.name)
++        return Path(names)
++
++    def file_template_for_path(self, path: Path, adf: Optional[str] = None) -> Optional[templates.FileTemplate]:
++        template = templates.ProfileTemplateRegistry.get_by_oid(self.templateID)
++        adf = adf or 'ADF.USIM'
++        for f in template.files:
++            relative = self._relative_path(template, f)
++            if Path([adf]) + relative == path or Path(['MF', adf]) + relative == path:
++                return f
++
++    def _usim_adf_node(self) -> 'FsNodeDF':
++        """Resolve ADF.USIM as created by the preceding PE-IoT (or an ADF 7FF1 below the MF)."""
++        iot_pe = self.pe_sequence.get_closest_prev_pe_for_templateID(self, oid.IoT_by_default)
++        if iot_pe and 'adf-usim' in iot_pe.files and iot_pe.files['adf-usim'].node:
++            return iot_pe.files['adf-usim'].node
++        if self.pe_sequence.mf:
++            try:
++                return self.pe_sequence.mf[0x7ff1]
++            except KeyError:
++                pass
++        if self.pe_sequence.cur_df:
++            return self.pe_sequence.cur_df
++        raise ValueError('PE-OPT-IoT requires ADF.USIM of a preceding PE-IoT (Section 8.3.4.8.2)')
++
++    def add_file(self, file: File):
++        if file.pe_name in self.files:
++            raise KeyError('Cannot add file: %s already exists' % file.pe_name)
++        self.files[file.pe_name] = file
++        if not self.pe_sequence:
++            return
++        template = templates.ProfileTemplateRegistry.get_by_oid(self.templateID)
++        pe_df = self._usim_adf_node()
++        # walk the intermediate DFs (DF.5GS, DF.SAIP); a DF the PE left out is created from its template row
++        for fid in (file.template.ppath if file.template else []):
++            try:
++                pe_df = pe_df[fid]
++                continue
++            except KeyError:
++                pass
++            container = [c for c in template.files if c.fid == fid and c.file_type in ['MF', 'DF', 'ADF']]
++            if not container:
++                raise KeyError('no template DF %04X on the path of %s' % (fid, file))
++            path_file = self.files.get(container[0].pe_name)
++            if not path_file:
++                path_file = File(container[0].pe_name, None, container[0])
++                self.files[container[0].pe_name] = path_file
++            pe_df = path_file.node if path_file.node else pe_df.add_file(path_file)
++        self.pe_sequence.cur_df = pe_df.add_file(file)
++
+ class ProfileElementISIM(FsProfileElement):
+     """Class representing the ProfileElement for ADF.ISIM Mandatory Files"""
+     type = 'isim'
+@@ -1640,7 +1771,8 @@
+         of a list of a list of PEs."""
+         self.pres_by_naa = {}
+         petype_not_naa_related = ['securityDomain', 'rfm', 'application', 'end']
+-        naa = ['mf', 'usim', 'isim', 'csim']
++        # PE-IoT creates ADF.USIM of an IoT Minimal Profile, so it starts the 'usim' NAA
++        naa = {'mf': 'mf', 'usim': 'usim', 'isim': 'isim', 'csim': 'csim', 'iot': 'usim'}
+         cur_naa = None
+         cur_naa_list = []
+         for pe in self.pe_list:
+@@ -1652,7 +1784,7 @@
+                     if not cur_naa in self.pes_by_naa:
+                         self.pes_by_naa[cur_naa] = []
+                     self.pes_by_naa[cur_naa].append(cur_naa_list)
+-                cur_naa = pe.type
++                cur_naa = naa[pe.type]
+                 cur_naa_list = []
+             cur_naa_list.append(pe)
+         # append the final one
+diff --git a/pySim/esim/saip/templates.py b/pySim/esim/saip/templates.py
+--- a/pySim/esim/saip/templates.py
++++ b/pySim/esim/saip/templates.py
+@@ -795,6 +795,71 @@
+         FileTemplate(0x4f06, 'EF.5G_PROSE_UIR',   'TR', None,   32,   2, 0x06, None,  True, ass_serv=[139,1005]),
+     ]
+ 
++class FilesIotMandatory(ProfileTemplate):
++    """Mandatory Files of the IoT Minimal Profile (MF and ADF.USIM) as per Section 9.10.1 v3.4.1"""
++    created_by_default = True
++    oid = OID.IoT_by_default
++    files = [
++        FileTemplate(0x3f00, 'MF',           'MF', None, None,   7, None, None, False, ['pinStatusTemplateDO']),
++        FileTemplate(0x2f05, 'EF.PL',        'TR', None,    2,   1, 0x05, 'FF...FF', False),
++        FileTemplate(0x2fe2, 'EF.ICCID',     'TR', None,   10,   6, None, None, False),
++        FileTemplate(0x2f00, 'EF.DIR',       'LF',    1, None,   5, 0x1e, None, False, ['size']),
++        FileTemplate(0x2f06, 'EF.ARR',       'LF',    8,   33,   5, None, None, False),
++        FileTemplate(0x2f08, 'EF.UMPC',      'TR', None,    5,   5, 0x08, None, False),
++        FileTemplate(0x7ff1, 'ADF.USIM',    'ADF', None, None,   7, None, None, False, ['aid', 'pinStatusTemplateDO']),
++        FileTemplate(0x6f07, 'EF.IMSI',      'TR', None,    9,   2, 0x07, None, True, ppath=[0x7ff1]),
++        FileTemplate(0x6f06, 'EF.ARR',       'LF', None, None,   5, 0x17, None, False, pe_name='ef-arr-usim', ppath=[0x7ff1]),
++        FileTemplate(0x6f08, 'EF.Keys',      'TR', None,   33,   4, 0x08, '07FF...FF', False, high_update=True, ppath=[0x7ff1]),
++        FileTemplate(0x6f09, 'EF.KeysPS',    'TR', None,   33,   4, 0x09, '07FF...FF', False, high_update=True, pe_name='ef-keysPS', ppath=[0x7ff1]),
++        FileTemplate(0x6f31, 'EF.HPPLMN',    'TR', None,    1,   2, 0x12, '0A', False, ppath=[0x7ff1]),
++        FileTemplate(0x6f38, 'EF.UST',       'TR', None,   17,   2, 0x04, '000000000100...00', False, ppath=[0x7ff1]),
++        FileTemplate(0x6f5b, 'EF.START-HFN', 'TR', None,    6,   4, 0x0f, 'F00000F00000', False, high_update=True, ppath=[0x7ff1]),
++        FileTemplate(0x6f5c, 'EF.THRESHOLD', 'TR', None,    3,   2, 0x10, 'FFFFFF', False, ppath=[0x7ff1]),
++        FileTemplate(0x6f73, 'EF.PSLOCI',    'TR', None,   14,   4, 0x0c, 'FFFFFFFFFFFFFFFFFFFF0000FF01', False, high_update=True, ppath=[0x7ff1]),
++        FileTemplate(0x6f78, 'EF.ACC',       'TR', None,    2,   2, 0x06, None, True, ppath=[0x7ff1]),
++        FileTemplate(0x6f7b, 'EF.FPLMN',     'TR', None,   12,   4, 0x0d, 'FF...FF', False, ppath=[0x7ff1]),
++        FileTemplate(0x6f7e, 'EF.LOCI',      'TR', None,   11,   4, 0x0b, 'FFFFFFFFFFFFFF0000FF01', False, high_update=True, ppath=[0x7ff1]),
++        FileTemplate(0x6fad, 'EF.AD',        'TR', None,    4,   5, 0x03, '00000002', False, ppath=[0x7ff1]),
++        FileTemplate(0x6fb7, 'EF.ECC',       'LF',    1,    4,   5, 0x01, 'FF...FF', False, ppath=[0x7ff1]),
++        FileTemplate(0x6fc4, 'EF.NETPAR',    'TR', None,  128,   4, None, 'FF...FF', False, high_update=True, ppath=[0x7ff1]),
++    ]
++
++class FilesIotOptional(ProfileTemplate):
++    """Optional Files of the IoT Minimal Profile below ADF.USIM as per Section 9.10.2 v3.4.1"""
++    created_by_default = False
++    optional = True
++    oid = OID.IoTopt_not_by_default
++    base_path = Path('ADF.USIM')
++    extends = FilesIotMandatory
++    files = [
++        FileTemplate(0x6f3b, 'EF.FDN',       'LF',   20,   26,   8, None, 'FF...FF', False, ass_serv=[2, 89]),
++        FileTemplate(0x6f3c, 'EF.SMS',       'LF',   10,  176,   4, None, '00FF...FF', False, ass_serv=[10]),
++        FileTemplate(0x6f42, 'EF.SMSP',      'LF',    1,   38,   4, None, 'FF...FF', False, ass_serv=[12]),
++        FileTemplate(0x6f43, 'EF.SMSS',      'TR', None,    2,   4, None, 'FFFF', False, ass_serv=[10]),
++        FileTemplate(0x6f46, 'EF.SPN',       'TR', None,   17,   5, None, None, True, ass_serv=[19]),
++        FileTemplate(0x6f56, 'EF.EST',       'TR', None,    1,   8, 0x05, None, True, ass_serv=[2, 6, 34, 35]),
++        FileTemplate(0x6f61, 'EF.OPLMNwAcT', 'TR', None,   40,   2, 0x11, 'FFFFFF0000', False, ass_serv=[42], repeat=True),
++        FileTemplate(0x6f62, 'EF.HPLMNwAcT', 'TR', None,    5,   2, 0x13, 'FFFFFF0000', False, ass_serv=[43], repeat=True),
++        FileTemplate(0x6fd9, 'EF.EHPLMN',    'TR', None,   15,   2, 0x1d, 'FF...FF', False, ass_serv=[71]),
++        FileTemplate(0x6fe3, 'EF.EPSLOCI',   'TR', None,   18,   4, 0x1e, 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000001', False, ass_serv=[85], high_update=True),
++        FileTemplate(0x6fe4, 'EF.EPSNSC',    'LF',    1,   80,   4, 0x18, 'FF...FF', False, ass_serv=[85], high_update=True),
++        FileTemplate(0x5fc0, 'DF.5GS',       'DF', None, None,   7, None, None, False, ['pinStatusTemplateDO'], pe_name='df-df-5gs'),
++        FileTemplate(0x4f01, 'EF.5GS3GPPLOCI',   'TR', None,   20,   4, 0x01, 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000001', False, ass_serv=[122], high_update=True, ppath=[0x5fc0]),
++        FileTemplate(0x4f02, 'EF.5GSN3GPPLOCI',  'TR', None,   20,   4, 0x02, 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000001', False, ass_serv=[122], high_update=True, ppath=[0x5fc0]),
++        FileTemplate(0x4f03, 'EF.5GS3GPPNSC',    'LF',    2,   62,   4, 0x03, 'FF...FF', False, ass_serv=[122, 136], high_update=True, ppath=[0x5fc0]),
++        FileTemplate(0x4f04, 'EF.5GSN3GPPNSC',   'LF',    2,   62,   4, 0x04, 'FF...FF', False, ass_serv=[122, 136], high_update=True, ppath=[0x5fc0]),
++        FileTemplate(0x4f05, 'EF.5GAUTHKEYS',    'TR', None,  110,   4, 0x05, 'FF...FF', False, ass_serv=[123], high_update=True, ppath=[0x5fc0]),
++        FileTemplate(0x4f06, 'EF.UAC_AIC',       'TR', None,    4,   2, 0x06, None, True, ass_serv=[126], ppath=[0x5fc0]),
++        FileTemplate(0x4f07, 'EF.SUCI_Calc_Info','TR', None,   44,   2, 0x07, 'FF...FF', False, ass_serv=[124], ppath=[0x5fc0]),
++        FileTemplate(0x4f08, 'EF.OPL5G',         'LF',    1,   10,   5, 0x08, 'FF...FF', False, ass_serv=[129], ppath=[0x5fc0]),
++        FileTemplate(0x4f09, 'EF.SUPI_NAI',      'TR', None,   20,   2, 0x09, None, True, ass_serv=[130], pe_name='ef-supi-nai', ppath=[0x5fc0]),
++        FileTemplate(0x4f0a, 'EF.Routing_Indicator', 'TR', None, 4,  2, 0x0a, 'F0FF0000', False, ass_serv=[124], ppath=[0x5fc0]),
++        FileTemplate(0x4f0b, 'EF.URSP',          'BT', None,  200,   2, None, None, False, ass_serv=[132], ppath=[0x5fc0]),
++        FileTemplate(0x4f0c, 'EF.TN3GPPSNN',     'TR', None,    1,   2, 0x0c, '00', False, ass_serv=[135], ppath=[0x5fc0]),
++        FileTemplate(0x5fd0, 'DF.SAIP',      'DF', None, None,   7, None, None, False, ['pinStatusTemplateDO'], pe_name='df-df-saip'),
++        FileTemplate(0x4f01, 'EF.SUCI_Calc_Info_USIM', 'TR', None, 44, 3, None, 'FF...FF', False, ass_serv=[125], pe_name='ef-suci-calc-info-usim', ppath=[0x5fd0]),
++    ]
++
+ class FilesIsimMandatory(ProfileTemplate):
+     """Mandatory Files at ADF.ISIM as per Section 9.6.1"""
+     created_by_default = True

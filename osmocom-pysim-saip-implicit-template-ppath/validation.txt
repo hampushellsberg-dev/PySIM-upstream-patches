@@ -1,0 +1,81 @@
+Before parent-path patch:
+
+Traceback (most recent call last):
+  ...
+KeyError: 24378
+
+After parent-path patch only, against the editable pySim checkout:
+
+$ env PYTHONDONTWRITEBYTECODE=1 python upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py
+Traceback (most recent call last):
+  File "<YggdraSIM>/upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py", line 78, in <module>
+    main()
+    ~~~~^^
+  File "<YggdraSIM>/upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py", line 69, in main
+    telecom._post_decode()
+    ~~~~~~~~~~~~~~~~~~~~^^
+  File "<YggdraSIM>/pysim/pySim/esim/saip/__init__.py", line 753, in _post_decode
+    self.pe2files()
+    ~~~~~~~~~~~~~^^
+  File "<YggdraSIM>/pysim/pySim/esim/saip/__init__.py", line 741, in pe2files
+    self.add_file(file)
+    ~~~~~~~~~~~~~^^^^^^
+  File "<YggdraSIM>/pysim/pySim/esim/saip/__init__.py", line 719, in add_file
+    self.pe_sequence.cur_df = self.pe_sequence.cur_df.add_file(file)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "<YggdraSIM>/pysim/pySim/esim/saip/__init__.py", line 2092, in add_file
+    raise ValueError("Cannot add %s of unknown file_type %s to tree" % (file, file.file_type))
+ValueError: Cannot add File(ef-pbc) of unknown file_type None to tree
+
+After applying both patches to a temporary pySim copy:
+
+$ env YGGDRASIM_REPRO_PYSIM_ROOT=/tmp/pysim-saip-pbc-verify.qYZVDB PYTHONDONTWRITEBYTECODE=1 python upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py
+3F00/7F10/5F3A/4F30
+3F00/7F10/5F3A/4F09
+
+$ python -c "import ast, pathlib; paths=[pathlib.Path('upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py'), pathlib.Path('/tmp/pysim-saip-pbc-verify.qYZVDB/pySim/esim/saip/__init__.py'), pathlib.Path('/tmp/pysim-saip-pbc-verify.qYZVDB/pySim/esim/saip/templates.py')]; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in paths]; print('ast ok')"
+ast ok
+
+$ git -C /tmp/pysim-saip-pbc-verify.qYZVDB diff --check -- pySim/esim/saip/__init__.py pySim/esim/saip/templates.py
+
+After applying both patches to the editable pySim checkout:
+
+$ env PYTHONDONTWRITEBYTECODE=1 python upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py
+3F00/7F10/5F3A/4F30
+3F00/7F10/5F3A/4F09
+
+$ python -c "import ast, pathlib; paths=[pathlib.Path('<pysim>/pySim/esim/saip/__init__.py'), pathlib.Path('<pysim>/pySim/esim/saip/templates.py'), pathlib.Path('upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py')]; [ast.parse(p.read_text(encoding='utf-8'), filename=str(p)) for p in paths]; print('ast ok')"
+ast ok
+
+$ git -C <pysim> diff --check -- pySim/esim/saip/__init__.py pySim/esim/saip/templates.py
+
+Bug 3 (EF.ICCID file identifier), against a pristine extract of base commit
+e0a9e73267f18fed1d81874938f5e2831afd12e6 with the full pySim package present
+(a partial extract silently falls back to the installed pySim and proves
+nothing):
+
+Before the patch:
+
+$ env YGGDRASIM_REPRO_PYSIM_ROOT=/tmp/pysim-base PYTHONDONTWRITEBYTECODE=1 python upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_mf_iccid_fid.py
+EF.ICCID fid=2F02
+EF.ICCID is declared at 2F02; TS 102 221 §13.2 assigns 2FE2.
+$ echo $?
+1
+
+After applying all three patches to the same extract:
+
+$ env YGGDRASIM_REPRO_PYSIM_ROOT=/tmp/pysim-base PYTHONDONTWRITEBYTECODE=1 python upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_mf_iccid_fid.py
+EF.ICCID fid=2FE2
+$ echo $?
+0
+
+$ env YGGDRASIM_REPRO_PYSIM_ROOT=/tmp/pysim-base PYTHONDONTWRITEBYTECODE=1 python upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_implicit_template_ppath.py
+3F00/7F10/5F3A/4F30
+3F00/7F10/5F3A/4F09
+
+$ git -C /tmp/pysim-base diff --check -- pySim/esim/saip/__init__.py pySim/esim/saip/templates.py
+
+$ python -c "import ast, pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ['/tmp/pysim-base/pySim/esim/saip/__init__.py', '/tmp/pysim-base/pySim/esim/saip/templates.py', 'upstream_patches/osmocom-pysim-saip-implicit-template-ppath/repro_saip_mf_iccid_fid.py']]; print('ast ok')"
+ast ok
+
+In the decoded file tree, EF.ICCID resolves at 3F00/2FE2 (was 3F00/2F02).

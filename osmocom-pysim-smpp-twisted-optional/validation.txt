@@ -1,0 +1,39 @@
+=== BEFORE (pySim c50f4b4 as declared, no override) ===
+uv.lock: 139 packages
+  twisted 23.10.0            <- held by smpp-twisted3 0.8 (Twisted~=23.10.0)
+  smpp-twisted3 0.8          <- pysim install_requires
+  smpp-pdu3 0.6              <- smpp-twisted3
+  automat, constantly, hyperlink, incremental, twisted-iocpsupport,
+  zope-interface             <- twisted
+Dependabot (1oT/YggdraSIM, default branch):
+  #3 high    Twisted  CVE-2026-42304  open
+  #2 medium  twisted  CVE-2024-41810  open
+  #1 medium  twisted  CVE-2024-41671  open
+uv lock --upgrade-package twisted: no change (nothing above 23.10.x is
+  allowed by smpp-twisted3, and 0.8 is its latest release)
+
+=== AFTER (pyproject.toml [tool.uv] override "smpp-twisted3 ; python_version < '0'") ===
+uv lock:
+  Removed twisted v23.10.0
+  Removed twisted-iocpsupport v1.0.4
+  Removed zope-interface v8.5
+  (plus smpp-twisted3, smpp-pdu3, automat, constantly, hyperlink,
+   incremental; nothing added)
+uv.lock: 130 packages; [manifest] records the override
+uv lock --check --python 3.11: Resolved 130 packages
+
+uv sync --frozen --extra full --extra test --extra mcp (throwaway venv):
+  import twisted        -> ImportError (expected)
+  import smpp.twisted   -> ImportError (expected)
+  from smpp.pdu import operations, pdu_types -> ok; DataCoding True, SubmitSM True
+  import pySim.transport, pySim.esim.saip, pySim.global_platform -> ok
+
+pytest in that venv:
+  tests/test_scp11_local_access.py         passed (SMPP PDU path)
+  tests/test_repo_module_import_smoke.py   passed (every module imports)
+  tests/test_scp03_pysim_parity.py         passed
+
+Not changed by the override: a `pip install` from the sdist follows
+pySim's own install_requires and still installs smpp.twisted3 with
+Twisted 23.10.0. Only the upstream patch (or a pySim fork carrying it)
+fixes that path.

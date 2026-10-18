@@ -1,0 +1,33 @@
+== before: stock pySim c50f4b4 ==
+FAIL class_for_petype('cdmaParameter') -- returns None
+FAIL class_for_petype('nonStandard') -- returns None
+FAIL class_for_petype('iot') -- returns None
+FAIL class_for_petype('opt-iot') -- returns None
+     decoded: [('header', 'ProfileElementHeader'), ('iot', 'ProfileElement'), ('opt-iot', 'ProfileElement'), ('end', 'ProfileElementEnd')]
+FAIL PE-IoT carries File objects -- files=[]
+FAIL sequence has an MF
+FAIL ADF.USIM 7FF1 below the MF
+FAIL PE-IoT starts the usim NAA group -- pes_by_naa={}
+ok   DER round trip is identical
+result: 8 failure(s)
+exit=1
+
+== after: pysim-saip-extra-profile-elements.patch applied ==
+ok   class_for_petype('cdmaParameter') -- returns 'ProfileElementCDMA'
+ok   class_for_petype('nonStandard') -- returns 'ProfileElementNonStandard'
+ok   class_for_petype('iot') -- returns 'ProfileElementIoT'
+ok   class_for_petype('opt-iot') -- returns 'ProfileElementOptIoT'
+     decoded: [('header', 'ProfileElementHeader'), ('iot', 'ProfileElementIoT'), ('opt-iot', 'ProfileElementOptIoT'), ('end', 'ProfileElementEnd')]
+ok   PE-IoT carries File objects -- files=['adf-usim', 'ef-acc', 'ef-arr', 'ef-arr-usim', 'ef-dir', 'ef-ecc', 'ef-iccid', 'ef-imsi', 'ef-ust', 'mf']
+ok   sequence has an MF
+ok   ADF.USIM 7FF1 below the MF
+ok   EF.IMSI 6F07 below ADF.USIM -- children=['0x6f07', '0x6f06', '0x6f38', '0x6f78', '0x6fb7', '0x6f3b', '0x5fc0', '0x5fd0']
+ok   PE-IoT.imsi decodes -- imsi='001010000000001'
+ok   PE-OPT-IoT EF.FDN below ADF.USIM
+ok   DF.5GS 5FC0 with EF.5GS3GPPLOCI
+ok   DF.SAIP 5FD0 with EF.SUCI_Calc_Info
+ok   PE-OPT-IoT files placed -- files=['df-df-5gs', 'df-df-saip', 'ef-5gs3gpploci', 'ef-fdn', 'ef-suci-calc-info-usim']
+ok   PE-IoT starts the usim NAA group -- pes_by_naa={'usim': [['iot', 'opt-iot']]}
+ok   DER round trip is identical
+result: PASS
+exit=0

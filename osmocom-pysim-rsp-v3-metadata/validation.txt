@@ -1,0 +1,43 @@
+=== BEFORE (upstream pySim, unpatched) ===
+baseline StoreMetadataRequest: 22 bytes
+
+  DROPPED rpmConfiguration                     (expected tag BA) -- identical to baseline
+  DROPPED hriServerAddress                     (expected tag 9B) -- identical to baseline
+  DROPPED lprConfiguration                     (expected tag BC) -- identical to baseline
+  DROPPED enterpriseConfiguration              (expected tag BD) -- identical to baseline
+  DROPPED serviceProviderMessage               (expected tag BE) -- identical to baseline
+  DROPPED serviceDescription                   (expected tag 9F1F) -- identical to baseline
+  DROPPED deviceChangeConfiguration            (expected tag BF20) -- identical to baseline
+  DROPPED estimatedProfileSize                 (expected tag 9F21) -- identical to baseline
+  DROPPED serviceSpecificDataStoredInEuicc     (expected tag BF22) -- identical to baseline
+  DROPPED serviceSpecificDataNotStoredInEuicc  (expected tag BF23) -- identical to baseline
+
+FAIL: 10 of 10 members unreachable: rpmConfiguration, hriServerAddress, lprConfiguration, enterpriseConfiguration, serviceProviderMessage, serviceDescription, deviceChangeConfiguration, estimatedProfileSize, serviceSpecificDataStoredInEuicc, serviceSpecificDataNotStoredInEuicc
+
+=== AFTER (vendored pysim/ with the patch applied) ===
+baseline StoreMetadataRequest: 22 bytes
+
+  OK      rpmConfiguration                     tag BA    22 -> 44 bytes
+  OK      hriServerAddress                     tag 9B    22 -> 40 bytes
+  OK      lprConfiguration                     tag BC    22 -> 43 bytes
+  OK      enterpriseConfiguration              tag BD    22 -> 38 bytes
+  OK      serviceProviderMessage               tag BE    22 -> 31 bytes
+  OK      serviceDescription                   tag 9F1F  22 -> 27 bytes
+  OK      deviceChangeConfiguration            tag BF20  22 -> 34 bytes
+  OK      estimatedProfileSize                 tag 9F21  22 -> 28 bytes
+  OK      serviceSpecificDataStoredInEuicc     tag BF22  22 -> 39 bytes
+  OK      serviceSpecificDataNotStoredInEuicc  tag BF23  22 -> 38 bytes
+
+PASS: every v3 member encodes under its assigned tag.
+
+=== Round-trip through the patched schema ===
+encoded 151 bytes; decode returns 12 members
+every encoded member decodes to the value it was given: True
+
+Omitting languageTag exercises the ASN.1 DEFAULT: the encoder leaves it
+out and the decoder supplies "en", which is correct, not a round-trip loss.
+  sent {'message': 'hi'} -> decoded {'message': 'hi', 'languageTag': 'en'}
+
+=== The SGP.22 v2 encoding is unchanged by the patch ===
+unpatched: BF25135A0A8988201234567890123491025350920150
+patched  : BF25135A0A8988201234567890123491025350920150
