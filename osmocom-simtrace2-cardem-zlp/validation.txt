@@ -1,0 +1,54 @@
+=== BEFORE (board firmware 0.9.0.2-e196, i.e. commit e1961be, read from its USB
+interface string on 2026-10-23; osmo-remsim-client-st2 1.2.0) ===
+repro_zlp_stall.py over the HIL bridge journal, 2026-08-10 to 2026-10-23:
+
+unterminated message: 14 TPDUs, 14 held
+  2026-09-08T12:31:23  Lc=0xF2    120.1 s after the last answer  reset_between=False  held=True
+  2026-09-08T14:06:14  Lc=0xF2    120.1 s after the last answer  reset_between=False  held=True
+  2026-10-07T09:08:55  Lc=0xF2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T12:08:24  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T13:09:52  Lc=0xF2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T13:47:03  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T13:49:28  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T13:51:53  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T13:56:46  Lc=0xB2    120.6 s after the last answer  reset_between=True  held=True
+  2026-10-07T13:59:11  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T14:01:36  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-07T14:04:01  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-23T11:14:49  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+  2026-10-23T12:41:31  Lc=0xB2    120.5 s after the last answer  reset_between=True  held=True
+other lengths: 134059 TPDUs, 4 held
+  2026-08-29T15:27:42  Lc=0x0F      6.0 s after the last answer  reset_between=True  held=True
+  2026-08-30T20:00:02  Lc=0x0F      4.4 s after the last answer  reset_between=True  held=True
+  2026-10-19T13:40:09  Lc=0x0F      5.6 s after the last answer  reset_between=True  held=True
+  2026-10-22T14:44:43  Lc=0x0F      5.6 s after the last answer  reset_between=True  held=True
+RECEIVE DATA bursts: 14272, ending in 97/160/224 bytes: 14
+  2026-09-08  2x  reads=[237, 237, 237, 237, 237, 224]  total=1409
+  2026-10-07  1x  reads=[237, 224]  total=461
+  2026-10-07  8x  reads=[237, 237, 237, 160]  total=871
+  2026-10-07  1x  reads=[237, 237, 237, 237, 237, 224]  total=1409
+  2026-10-23  2x  reads=[237, 160]  total=397
+most common last reads: [(228, 4021), (31, 1487), (60, 1343), (51, 1170), (153, 1154), (200, 882), (103, 796), (13, 434)]
+
+The four held TPDUs of other lengths are 15-byte TERMINAL RESPONSEs that
+reached the bridge right after a card reset, about 5 s after the previous
+answer (2026-08-29, 2026-08-30, 2026-10-19, 2026-10-22): owed across a
+reset the modem or the bridge made, in a 29-byte message, so not this bug.
+
+=== AFTER ===
+2026-10-23: the patch built on master 0.9.1-24-g9467005 and flashed; the board
+reports 0.9.1.24-9467-dirty in its USB interface string, and the REMSIM client
+attaches and completes the bridge handshake on it.
+
+AT+CSIM pair from README.md on the modem's AT port, 13:58 CEST: both answered
++CSIM: 4,"6F00" at once, with no UICC reset.
+  Lc B1 (191-byte message): client forwarded 13:58:09.582158, bridge answered 13:58:09.582499
+  Lc B2 (192-byte message): client forwarded 13:58:25.285139, bridge answered 13:58:25.285465
+
+repro_zlp_stall.py from the flash (13:53) on:
+unterminated message: 1 TPDUs, 0 held
+  2026-10-23T13:58:25  Lc=0xB2     15.7 s after the last answer  reset_between=False  held=False
+other lengths: 113 TPDUs, 0 held
+(The 15.7 s is the time between pasting the two commands.)
+
+Still to run: a session of several hours with BIP traffic, scanned the same way.

@@ -39,6 +39,22 @@ Expected after the fix: `nb_rec=2 file_size=68` from pySim itself.
 descriptor carries no record count, derive it from `efFileSize` even if the
 template supplied one.
 
+## Companion patch for pySim master
+
+`smsp-tp-sc-addr-record-1.patch` goes in first. `SmspTpScAddr`
+(`pySim/esim/saip/personalization.py`, since `0fe432f`) decodes the whole
+EF.SMSP body as record 1 and writes one record back as the whole body. The
+TS.48 v5 profiles in `smdpp-data/upp` declare EF.SMSP with the 4-byte
+`fileDescriptor` `42 21 00 2A` (record length 42, no record count) and
+`efFileSize` 84. Once the record count follows `efFileSize` the body holds
+both records, the single-record decode fails (`UnicodeDecodeError:
+'gsm03.38' codec can't decode byte 0xff in position 0`), and
+`tests/unittests/test_configurable_parameters.py` on master, which
+personalises those profiles, fails with it. The companion decodes and
+encodes record 1 only and keeps the records after it: the test passes with
+and without the record count fix, and personalising one of those profiles
+keeps both records (84 bytes) with record 2 unchanged.
+
 ## YggdraSIM-side compensation
 
 `yggdrasim_common/gui_server/actions/saip.py::_record_count_from_declared_size`
@@ -54,4 +70,5 @@ depend on it.
 - [x] Template file with a 5-byte descriptor carrying the count (unchanged).
 - [x] Generic-file-management file without a template (count from the descriptor or the body).
 - [x] Transparent EF (`rec_len` None): untouched.
+- [x] pySim master `9aa8934`: `test_configurable_parameters` with the companion patch, before and after the fix.
 - [ ] Upstream merge request.
