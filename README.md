@@ -6,7 +6,7 @@ top of the upstream branch, in an order that applies and tests cleanly:
 
 | Project | Fork, branch | On top of | Commits | Tip |
 |---|---|---|---|---|
-| pySim | [hampushellsberg-dev/pysim](https://github.com/hampushellsberg-dev/pysim), `master` | osmocom/pysim `master` at `9aa8934` | 17 | `f2db3ab` |
+| pySim | [hampushellsberg-dev/pysim](https://github.com/hampushellsberg-dev/pysim), `master` | osmocom/pysim `master` at `9aa8934` | 24 | `3322531` |
 | simtrace2 | [hampushellsberg-dev/simtrace2](https://github.com/hampushellsberg-dev/simtrace2), `master` | osmocom/simtrace2 `master` at `9467005` | 1 | `697db3b` |
 | asn1tools | [hampushellsberg-dev/asn1tools-loop-fix](https://github.com/hampushellsberg-dev/asn1tools-loop-fix), `master` | osmocom/asn1tools `master` at `44277cd` | 2 | `c204026` |
 | asn1tools | same fork, `fix-unbounded-loops` | eerimoq/asn1tools 0.167.0 at `7b72219` | 1 | `1d0c56f` |
@@ -46,6 +46,13 @@ fix before the optimised body encoding).
 | 15 | `b7c4e42` | esim.saip: apply proprietaryEFInfo when the Fcp has no fileDescriptor | [osmocom-pysim-saip-proprietary-efinfo-without-descriptor](osmocom-pysim-saip-proprietary-efinfo-without-descriptor/) |
 | 16 | `393b507` | esim.saip: encode an optimised body against the creation content | [osmocom-pysim-saip-optimised-body-encoding](osmocom-pysim-saip-optimised-body-encoding/) |
 | 17 | `f2db3ab` | esim.saip: the keyList of a PE-SecurityDomain is optional | [osmocom-pysim-saip-sd-optional-key-list](osmocom-pysim-saip-sd-optional-key-list/) |
+| 18 | `d5b3266` | esim/asn1/rsp: decode the SGP.22 v3 members of EUICCInfo1 and EUICCInfo2 | [osmocom-pysim-rsp-v3-euiccinfo](osmocom-pysim-rsp-v3-euiccinfo/) |
+| 19 | `3fd51ec` | esim/asn1: add the SGP.22 v3.1 RSPDefinitions module as rsp_v3 | [osmocom-pysim-rsp-v3-module](osmocom-pysim-rsp-v3-module/) |
+| 20 | `adf97af` | esim/asn1/rsp: add OperatorId as an alias of OperatorID | [osmocom-pysim-rsp-operatorid](osmocom-pysim-rsp-operatorid/) |
+| 21 | `74f5002` | log: print a record only once when loggers are nested | [osmocom-pysim-log-duplicate-handlers](osmocom-pysim-log-duplicate-handlers/) |
+| 22 | `7723a45` | esim.saip: split a fillFileOffset beyond the range of UInt16 | [osmocom-pysim-saip-optimised-body-encoding](osmocom-pysim-saip-optimised-body-encoding/) |
+| 23 | `1460a87` | esim.saip: keep keyAccess and keyCounterValue of security domain keys | [osmocom-pysim-saip-sd-key-access-counter](osmocom-pysim-saip-sd-key-access-counter/) |
+| 24 | `3322531` | esim.saip: fix decoding of rfu PEs with an empty body | [osmocom-pysim-saip-empty-pe-body](osmocom-pysim-saip-empty-pe-body/) |
 
 Commit 10 has no folder of its own. `SmspTpScAddr` in
 `pySim/esim/saip/personalization.py` has read EF.SMSP as a single record
@@ -61,6 +68,12 @@ Checked at every commit: the tree compiles, `test_esim_saip`, `test_files`,
 commit that completes its fix. On the last commit every file in
 `tests/unittests` gives the result it gives on `9aa8934`, plus the
 added test vectors.
+
+Commits 18-24 (2026-10-29) were checked file by file over all of
+`tests/unittests` at each commit: only `test_log` (a colour-code assertion)
+and `test_smpp_ota_tool` (needs smpplib) fail, as they do on `f2db3ab`. Each
+of them adds a test that fails without its fix, and each folder's repro passes
+from its commit on.
 
 ## simtrace2
 

@@ -1,0 +1,166 @@
+diff --git a/pySim/esim/asn1/rsp/rsp.asn b/pySim/esim/asn1/rsp/rsp.asn
+index 372f72b..90a9e52 100644
+--- a/pySim/esim/asn1/rsp/rsp.asn
++++ b/pySim/esim/asn1/rsp/rsp.asn
+@@ -28,7 +28,10 @@ GetEuiccInfo1Request ::= [32] SEQUENCE { -- Tag 'BF20'
+ EUICCInfo1 ::= [32] SEQUENCE { -- Tag 'BF20'
+     svn [2] VersionType,    -- GSMA SGP.22 version supported (SVN)
+     euiccCiPKIdListForVerification [9] SEQUENCE OF SubjectKeyIdentifier, -- List of CI Public Key Identifiers supported on the eUICC for signature verification
+-    euiccCiPKIdListForSigning [10] SEQUENCE OF SubjectKeyIdentifier -- List of CI Public Key Identifier supported on the eUICC for signature creation
++    euiccCiPKIdListForSigning [10] SEQUENCE OF SubjectKeyIdentifier, -- List of CI Public Key Identifier supported on the eUICC for signature creation
++    euiccCiPKIdListForSigningV3 [17] SEQUENCE OF SubjectKeyIdentifier OPTIONAL, -- #SupportedFromV3.0.0# List of eSIM CA RootCA Public Key Identifiers supported on the eUICC for signature creation that can be verified by a certificate chain according to Variant Ov3, A, B or C.
++    euiccRspCapability [8] RspCapability OPTIONAL, -- #MandatoryFromV3.0.0# EuiccRspCapability in SGP.22 v3
++    highestSvn [19] VersionType OPTIONAL -- #SupportedFromV3.0.0#
+ }
+  
+ -- Definition of EUICCInfo2 --------------------------
+@@ -55,9 +58,21 @@ EUICCInfo2 ::= [34] SEQUENCE { -- Tag 'BF22'
+     forbiddenProfilePolicyRules [25] PprIds OPTIONAL, -- Tag '99'
+     ppVersion VersionType, -- Protection Profile version
+     sasAcreditationNumber UTF8String (SIZE(0..64)),
+-    certificationDataObject [12] CertificationDataObject OPTIONAL
++    certificationDataObject [12] CertificationDataObject OPTIONAL,
++    treProperties [13] BIT STRING {
++        isDiscrete(0),
++        isIntegrated(1),
++        usesRemoteMemory(2) -- refers to the usage of remote memory protected by the Remote Memory Protection Function described in SGP.21 [4]
++    } OPTIONAL, -- #Mandatory for Integrated eUICC
++    treProductReference [14] UTF8String OPTIONAL, -- Platform_Label as defined in GlobalPlatform DLOA specification [57]
++    additionalProfilePackageVersions [15] SEQUENCE OF VersionType OPTIONAL, -- #SupportedFromV3.0.0#
++    lpaMode [16] LpaMode OPTIONAL, -- #MandatoryFromV3.0.0# active LPA
++    euiccCiPKIdListForSigningV3 [17] SEQUENCE OF SubjectKeyIdentifier OPTIONAL, -- #SupportedFromV3.0.0# List of eSIM CA RootCA Public Key Identifiers supported on the eUICC for signature creation that can be verified by a certificate chain according to Variant Ov3, A, B or C.
++    additionalEuiccInfo [18] OCTET STRING (SIZE(0..32)) OPTIONAL, -- #SupportedFromV3.0.0# EUM specific eUICC information
++    highestSvn [19] VersionType OPTIONAL, -- #SupportedFromV3.0.0#
++    iotSpecificInfo [20] IoTSpecificInfo OPTIONAL -- reserved for SGP.32 [97]
+ }
+- 
++
+ -- Definition of RspCapability
+ RspCapability ::= BIT STRING {
+     additionalProfile(0), -- at least one more Profile can be installed
+@@ -65,7 +80,17 @@ RspCapability ::= BIT STRING {
+     rpmSupport(2), -- Remote Profile Management
+     testProfileSupport (3) -- support for test profile
+ }
+- 
++
++-- Definition of LpaMode
++LpaMode ::= INTEGER {
++    lpad (0), -- LPAd is active
++    lpae (1) -- LPAe is active
++}
++
++-- Definition of IoTSpecificInfo
++IoTSpecificInfo ::= SEQUENCE {
++}
++
+ -- Definition of CertificationDataObject
+ CertificationDataObject ::= SEQUENCE {
+     platformLabel UTF8String,   -- Platform_Label as defined in GlobalPlatform DLOA specification [57]
+diff --git a/tests/unittests/test_esim_rsp.py b/tests/unittests/test_esim_rsp.py
+new file mode 100644
+index 0000000..428d7f4
+--- /dev/null
++++ b/tests/unittests/test_esim_rsp.py
+@@ -0,0 +1,101 @@
++#!/usr/bin/env python3
++
++# (C) 2026 by Hampus Hellsberg <hampushellsberg@gmail.com>
++#
++# This program is free software: you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation, either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import unittest
++from osmocom.utils import h2b
++
++import pySim.esim.rsp as rsp
++
++SKI_V2 = '11' * 20
++SKI_V3 = '22' * 20
++
++def tlv(tag: str, value_hex: str) -> str:
++    """Hex of a DER TLV (length below 256), for building the test vectors by hand."""
++    length = len(value_hex) // 2
++    assert length < 0x100
++    if length < 0x80:
++        return tag + '%02x' % length + value_hex
++    return tag + '81%02x' % length + value_hex
++
++# EUICCInfo1 as an SGP.22 v3.1 eUICC returns it (SGP.22 v3.1 Annex H)
++EUICC_INFO1_V3 = tlv('bf20',
++    tlv('82', '030100') +                       # lowestSvn [2] (svn in v2)
++    tlv('a9', tlv('04', SKI_V2)) +              # euiccCiPKIdListForVerification [9]
++    tlv('aa', tlv('04', SKI_V2)) +              # euiccCiPKIdListForSigning [10]
++    tlv('b1', tlv('04', SKI_V3)) +              # euiccCiPKIdListForSigningV3 [17]
++    tlv('88', '05900020') +                     # euiccRspCapability [8]: bits 0, 3, 18
++    tlv('93', '030100'))                        # highestSvn [19]
++
++EUICC_INFO1_V2 = tlv('bf20',
++    tlv('82', '020500') +
++    tlv('a9', tlv('04', SKI_V2)) +
++    tlv('aa', tlv('04', SKI_V2)))
++
++EUICC_INFO2_V3 = tlv('bf22',
++    tlv('81', '030301') +                       # profileVersion [1]
++    tlv('82', '030100') +                       # svn [2]
++    tlv('83', '010203') +                       # euiccFirmwareVer [3]
++    tlv('84', '0103') +                         # extCardResource [4]
++    tlv('85', '0780') +                         # uiccCapability [5]
++    tlv('88', '0490') +                         # rspCapability [8]: bits 0, 3
++    tlv('a9', tlv('04', SKI_V2)) +              # euiccCiPKIdListForVerification [9]
++    tlv('aa', tlv('04', SKI_V2)) +              # euiccCiPKIdListForSigning [10]
++    tlv('04', '010000') +                       # ppVersion
++    tlv('0c', '') +                             # sasAcreditationNumber
++    tlv('8d', '0640') +                         # treProperties [13]: isIntegrated
++    tlv('8e', '544553542d545245') +             # treProductReference [14]
++    tlv('af', tlv('04', '020300')) +            # additionalProfilePackageVersions [15]
++    tlv('90', '00') +                           # lpaMode [16]: lpad
++    tlv('b1', tlv('04', SKI_V3)) +              # euiccCiPKIdListForSigningV3 [17]
++    tlv('92', 'cafe') +                         # additionalEuiccInfo [18]
++    tlv('93', '030100') +                       # highestSvn [19]
++    tlv('b4', ''))                              # iotSpecificInfo [20]
++
++
++class TestEuiccInfoV3Members(unittest.TestCase):
++    """EUICCInfo1/2 are read before the SGP.22 version of the eUICC is known, so the
++    v2 module has to decode the v3 members instead of dropping them."""
++
++    def test_euicc_info1_v3_members(self):
++        dec = rsp.asn1.decode('EUICCInfo1', h2b(EUICC_INFO1_V3))
++        self.assertEqual(dec['svn'], h2b('030100'))
++        self.assertEqual(dec['euiccCiPKIdListForSigningV3'], [h2b(SKI_V3)])
++        self.assertEqual(dec['euiccRspCapability'], (h2b('900020'), 19))
++        self.assertEqual(dec['highestSvn'], h2b('030100'))
++        self.assertEqual(rsp.asn1.encode('EUICCInfo1', dec), h2b(EUICC_INFO1_V3))
++
++    def test_euicc_info1_v2_encoding_unchanged(self):
++        dec = rsp.asn1.decode('EUICCInfo1', h2b(EUICC_INFO1_V2))
++        self.assertEqual(set(dec.keys()),
++                         {'svn', 'euiccCiPKIdListForVerification', 'euiccCiPKIdListForSigning'})
++        self.assertEqual(rsp.asn1.encode('EUICCInfo1', dec), h2b(EUICC_INFO1_V2))
++
++    def test_euicc_info2_v3_members(self):
++        dec = rsp.asn1.decode('EUICCInfo2', h2b(EUICC_INFO2_V3))
++        self.assertEqual(dec['treProperties'], (h2b('40'), 2))
++        self.assertEqual(dec['treProductReference'], 'TEST-TRE')
++        self.assertEqual(dec['additionalProfilePackageVersions'], [h2b('020300')])
++        self.assertEqual(dec['lpaMode'], 0)    # lpad
++        self.assertEqual(dec['euiccCiPKIdListForSigningV3'], [h2b(SKI_V3)])
++        self.assertEqual(dec['additionalEuiccInfo'], h2b('cafe'))
++        self.assertEqual(dec['highestSvn'], h2b('030100'))
++        self.assertEqual(dec['iotSpecificInfo'], {})
++        self.assertEqual(rsp.asn1.encode('EUICCInfo2', dec), h2b(EUICC_INFO2_V3))
++
++
++if __name__ == "__main__":
++    unittest.main()

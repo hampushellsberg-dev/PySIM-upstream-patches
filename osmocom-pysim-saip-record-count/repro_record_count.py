@@ -4,16 +4,16 @@
 ``File.from_template`` copies ``nb_rec`` from the TCA template and
 ``from_fileDescriptor`` recomputes it from ``efFileSize`` only while it is
 still ``None``, so a profile whose descriptor omits the record count but
-declares a larger size keeps the template default. Run on the pinned
-pySim; the YggdraSIM compensation is printed next to it.
+declares a larger size keeps the template default. Exits non-zero while
+the pySim on the path keeps the template count. (The YggdraSIM-side
+compensation that used to be printed here was retired on 2026-10-23, when
+YggdraSIM pinned hampushellsberg-dev/pysim, which carries this fix.)
 """
 
 from __future__ import annotations
 
 from pySim.esim.saip import File
 from pySim.esim.saip.templates import ProfileTemplateRegistry
-
-from yggdrasim_common.gui_server.actions.saip import _record_count_from_declared_size
 
 template = None
 for candidate in ProfileTemplateRegistry.by_oid.values():
@@ -29,7 +29,6 @@ pe_file = File("ef-msisdn", template=template)
 pe_file.from_fileDescriptor({"fileDescriptor": bytes.fromhex("42210022"), "efFileSize": b"\x44"})
 print("pySim after from_fileDescriptor: nb_rec=%s rec_len=%s file_size=%s"
       % (pe_file.nb_rec, pe_file.rec_len, pe_file.file_size))
-body = b"\xff" * 68
-count, size = _record_count_from_declared_size(pe_file, body, pe_file.rec_len, pe_file.nb_rec, pe_file.file_size)
-print("YggdraSIM compensation: nb_rec=%s file_size=%s" % (count, size))
-assert count == 2 and size == 68
+fixed = pe_file.nb_rec == 2 and pe_file.file_size == 68
+print("OK" if fixed else "WRONG: the template count won over efFileSize")
+raise SystemExit(0 if fixed else 1)

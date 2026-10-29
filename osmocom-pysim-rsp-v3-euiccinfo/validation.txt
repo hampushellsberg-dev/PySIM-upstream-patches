@@ -1,0 +1,168 @@
+Validation of pysim-rsp-v3-euiccinfo.patch on hampushellsberg-dev/pysim f2db3ab
+(osmocom pySim master 9aa8934 + the series). Run 2026-10-29, Python 3.13, asn1tools 0.166.0.
+
+1. Repro, before and after
+
+== before: pinned hampushellsberg-dev/pysim f2db3ab (installed)
+pySim from <venv>/lib/python3.13/site-packages/pySim/__init__.py
+
+EUICCInfo1: 91 bytes in, 56 bytes re-encoded
+  DROPPED euiccCiPKIdListForSigningV3
+  DROPPED euiccRspCapability
+  DROPPED highestSvn
+
+EUICCInfo2: 145 bytes in, 85 bytes re-encoded
+  DROPPED treProperties
+  DROPPED treProductReference
+  DROPPED additionalProfilePackageVersions
+  DROPPED lpaMode
+  DROPPED euiccCiPKIdListForSigningV3
+  DROPPED additionalEuiccInfo
+  DROPPED highestSvn
+  DROPPED iotSpecificInfo
+
+FAIL: 11 members dropped without an error: EUICCInfo1.euiccCiPKIdListForSigningV3, EUICCInfo1.euiccRspCapability, EUICCInfo1.highestSvn, EUICCInfo2.treProperties, EUICCInfo2.treProductReference, EUICCInfo2.additionalProfilePackageVersions, EUICCInfo2.lpaMode, EUICCInfo2.euiccCiPKIdListForSigningV3, EUICCInfo2.additionalEuiccInfo, EUICCInfo2.highestSvn, EUICCInfo2.iotSpecificInfo
+exit=1
+
+== after: f2db3ab + pysim-rsp-v3-euiccinfo.patch
+pySim from <scratch>/pysim/pySim/__init__.py
+
+EUICCInfo1: 91 bytes in, 91 bytes re-encoded
+  OK      euiccCiPKIdListForSigningV3
+  OK      euiccRspCapability
+  OK      highestSvn
+
+EUICCInfo2: 145 bytes in, 145 bytes re-encoded
+  OK      treProperties
+  OK      treProductReference
+  OK      additionalProfilePackageVersions
+  OK      lpaMode
+  OK      euiccCiPKIdListForSigningV3
+  OK      additionalEuiccInfo
+  OK      highestSvn
+  OK      iotSpecificInfo
+
+PASS: every SGP.22 v3 member of EUICCInfo1/2 decodes.
+exit=0
+
+2. pySim unit tests, every tests/unittests file, run as pySim's CI does
+   (python -m unittest discover -s tests/unittests -p <file>, from the tree root).
+   test_log and test_smpp_ota_tool fail identically on the unpatched tree
+   (colour codes in this venv, no smpplib installed).
+
+-- unpatched f2db3ab
+pySim resolved from: <scratch>/pysim-pristine/pySim/__init__.py
+test_apdu.py                             rc=0 Ran 6 tests | OK
+test_bip_relay.py                        rc=0 Ran 18 tests | OK
+test_card_key_provider.py                rc=0 Ran 4 tests | OK
+test_cat.py                              rc=0 Ran 11 tests | OK
+test_configurable_parameters.py          rc=0 Ran 40 tests | OK
+test_decode_select_resp.py               rc=0 Ran 2 tests | OK
+test_esim.py                             rc=0 Ran 2 tests | OK
+test_esim_bsp.py                         rc=0 Ran 4 tests | OK
+test_esim_saip.py                        rc=0 Ran 11 tests | OK
+test_euicc.py                            rc=0 Ran 5 tests | OK
+test_files.py                            rc=0 Ran 12 tests | OK
+test_fs_coverage.py                      rc=0 Ran 1 test | OK
+test_globalplatform.py                   rc=0 Ran 107 tests | OK
+test_javacard.py                         rc=0 Ran 1 test | OK
+test_log.py                              rc=1 Ran 5 tests | FAILED (failures=1)
+test_ota.py                              rc=0 Ran 38 tests | OK
+test_param_src.py                        rc=0 Ran 1 test | OK
+test_smpp_ota_tool.py                    rc=1 Ran 1 test | FAILED (errors=1)
+test_sms.py                              rc=0 Ran 23 tests | OK
+test_tlvs.py                             rc=0 Ran 3 tests | OK
+test_transport.py                        rc=0 Ran 23 tests | OK
+test_utils.py                            rc=0 Ran 34 tests | OK
+
+-- patched
+pySim resolved from: <scratch>/pysim/pySim/__init__.py
+test_apdu.py                             rc=0 Ran 6 tests | OK
+test_bip_relay.py                        rc=0 Ran 18 tests | OK
+test_card_key_provider.py                rc=0 Ran 4 tests | OK
+test_cat.py                              rc=0 Ran 11 tests | OK
+test_configurable_parameters.py          rc=0 Ran 40 tests | OK
+test_decode_select_resp.py               rc=0 Ran 2 tests | OK
+test_esim.py                             rc=0 Ran 2 tests | OK
+test_esim_bsp.py                         rc=0 Ran 4 tests | OK
+test_esim_rsp.py                         rc=0 Ran 3 tests | OK
+test_esim_saip.py                        rc=0 Ran 11 tests | OK
+test_euicc.py                            rc=0 Ran 5 tests | OK
+test_files.py                            rc=0 Ran 12 tests | OK
+test_fs_coverage.py                      rc=0 Ran 1 test | OK
+test_globalplatform.py                   rc=0 Ran 107 tests | OK
+test_javacard.py                         rc=0 Ran 1 test | OK
+test_log.py                              rc=1 Ran 5 tests | FAILED (failures=1)
+test_ota.py                              rc=0 Ran 38 tests | OK
+test_param_src.py                        rc=0 Ran 1 test | OK
+test_smpp_ota_tool.py                    rc=1 Ran 1 test | FAILED (errors=1)
+test_sms.py                              rc=0 Ran 23 tests | OK
+test_tlvs.py                             rc=0 Ran 3 tests | OK
+test_transport.py                        rc=0 Ran 23 tests | OK
+test_utils.py                            rc=0 Ran 34 tests | OK
+
+3. python -m compileall pySim/esim tests/unittests/test_esim_rsp.py: no errors.
+
+== 2026-10-29: hampushellsberg-dev/pysim d5b3266 on top of f2db3ab
+   esim/asn1/rsp: decode the SGP.22 v3 members of EUICCInfo1 and EUICCInfo2
+
+repro at d5b3266:
+    OK      euiccCiPKIdListForSigningV3
+    OK      additionalEuiccInfo
+    OK      highestSvn
+    OK      iotSpecificInfo
+  
+  PASS: every SGP.22 v3 member of EUICCInfo1/2 decodes.
+
+tests/unittests at f2db3ab (pySim CI invocation, file by file):
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.029s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.000s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.789s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.005s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.061s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.577s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.025s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 5 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2
+
+tests/unittests at d5b3266:
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.030s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.001s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.794s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.005s OK
+  OK   test_esim_rsp.py                         Ran 3 tests in 0.000s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.062s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.582s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.024s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 5 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2

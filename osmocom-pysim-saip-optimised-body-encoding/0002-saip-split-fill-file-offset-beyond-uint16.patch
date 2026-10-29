@@ -1,0 +1,42 @@
+diff --git a/pySim/esim/saip/__init__.py b/pySim/esim/saip/__init__.py
+index 9529d41..bec4d7a 100644
+--- a/pySim/esim/saip/__init__.py
++++ b/pySim/esim/saip/__init__.py
+@@ -524,7 +524,12 @@ class File:
+         for block in non_matching_blocks:
+             # fillFileOffset moves the pointer relative to its current position, and
+             # fillFileContent leaves it after the last byte written (SAIP section 8.3.5)
+-            ret.append(('fillFileOffset', block.a - cur))
++            offset = block.a - cur
++            # fillFileOffset is a UInt16 (SAIP section 8.3.2): a longer move takes several
++            while offset > 0xffff:
++                ret.append(('fillFileOffset', 0xffff))
++                offset -= 0xffff
++            ret.append(('fillFileOffset', offset))
+             ret.append(('fillFileContent', self.body[block.a:block.a+block.size]))
+             cur = block.a + block.size
+         return ret
+diff --git a/tests/unittests/test_esim_saip.py b/tests/unittests/test_esim_saip.py
+index 75a38f4..e6f9882 100755
+--- a/tests/unittests/test_esim_saip.py
++++ b/tests/unittests/test_esim_saip.py
+@@ -125,6 +125,19 @@ class SaipTest(unittest.TestCase):
+                 pes.append(inst)
+                 pes.to_der()
+ 
++class FileContentTest(unittest.TestCase):
++    def test_fill_file_offset_fits_uint16(self):
++        # fillFileOffset is a UInt16 (SAIP 8.3.2): a longer gap takes several steps
++        template = templates.FileTemplate(0x6f99, 'EF.TEST', 'TR', None, 70000, 5, None, None)
++        body = bytearray(b'\xff' * 70000)
++        body[66000] = 0x00
++        f = File('test', [('fileDescriptor', {})], template)
++        f.body = bytes(body)
++        tuples = f.file_content_to_tuples(optimize=True)
++        offsets = [v for k, v in tuples if k == 'fillFileOffset']
++        self.assertEqual(offsets, [0xffff, 66000 - 0xffff])
++        self.assertEqual(f.file_content_from_tuples(tuples), bytes(body))
++
+ class OidTest(unittest.TestCase):
+     def test_cmp(self):
+         self.assertTrue(oid.OID('1.0') > oid.OID('0.9'))

@@ -1,0 +1,50 @@
+diff --git a/pySim/esim/asn1/rsp/rsp.asn b/pySim/esim/asn1/rsp/rsp.asn
+index 90a9e52..3b4e886 100644
+--- a/pySim/esim/asn1/rsp/rsp.asn
++++ b/pySim/esim/asn1/rsp/rsp.asn
+@@ -199,6 +199,10 @@ OperatorID ::= SEQUENCE {
+     gid2 OCTET STRING OPTIONAL -- referring to content of EF GID2 (file identifier '6F3F') as defined in 3GPP TS 31.102 [54]
+ }
+  
++-- The same type as spelled in SGP.22 v3.1 Annex H, and imported under that name from this
++-- module by the SGP.32 v1.3 ASN.1 module (IMPORTS ... OperatorId ... FROM RSPDefinitions)
++OperatorId ::= OperatorID
++
+ ProfileInfoListError ::= INTEGER {incorrectInputValues(1), undefinedError(127)}
+  
+ -- Definition of StoreMetadata request
+diff --git a/tests/unittests/test_esim_rsp.py b/tests/unittests/test_esim_rsp.py
+index 150637c..cb7d3a0 100644
+--- a/tests/unittests/test_esim_rsp.py
++++ b/tests/unittests/test_esim_rsp.py
+@@ -209,5 +209,30 @@ class TestRspV3Module(unittest.TestCase):
+         self.assertEqual(dec['operationType'], (h2b('80'), 1))
+ 
+ 
++class TestOperatorIdName(unittest.TestCase):
++    """SGP.22 v3.1 and the SGP.32 v1.3 module, which imports it from RSPDefinitions, spell
++    the type OperatorId; the v2 module calls it OperatorID."""
++
++    OWNER = {'mccMnc': h2b('00f110'), 'gid1': h2b('01')}
++
++    def test_alias_encodes_like_operator_id(self):
++        enc = rsp.asn1.encode('OperatorId', self.OWNER)
++        self.assertEqual(enc, rsp.asn1.encode('OperatorID', self.OWNER))
++        self.assertEqual(rsp.asn1.decode('OperatorId', enc), self.OWNER)
++
++    def test_importable_under_the_v3_name(self):
++        from importlib import resources
++        rsp_dir = resources.files('pySim.esim').joinpath('asn1').joinpath('rsp')
++        rsp_txt = '\n'.join(i.read_text() for i in rsp_dir.iterdir() if i.name.endswith('.asn'))
++        importer = """Importer DEFINITIONS AUTOMATIC TAGS ::= BEGIN
++IMPORTS OperatorId FROM RSPDefinitions {joint-iso-itu-t(2) international-organizations(23) gsma(146) rsp(1) asn1modules(1) sgp22v2(2)};
++Owner ::= SEQUENCE { profileOwner [23] OperatorId }
++END
++"""
++        spec = asn1tools.compile_string(rsp_txt + '\n' + importer, codec='der')
++        enc = spec.encode('Owner', {'profileOwner': self.OWNER})
++        self.assertEqual(enc[2:], h2b('b7') + rsp.asn1.encode('OperatorID', self.OWNER)[1:])
++
++
+ if __name__ == "__main__":
+     unittest.main()

@@ -1,0 +1,34 @@
+diff --git a/pySim/log.py b/pySim/log.py
+index 5aeeed4..9ec47e5 100644
+--- a/pySim/log.py
++++ b/pySim/log.py
+@@ -41,6 +41,10 @@ class _PySimLogHandler(logging.Handler):
+         self.log_callback = log_callback
+ 
+     def emit(self, record):
++        # a record also reaches the handlers PySimLogger.get() put on its parent loggers
++        if getattr(record, '_pysim_printed', False):
++            return
++        record._pysim_printed = True
+         formatted_message = self.format(record)
+         self.log_callback(formatted_message, record)
+ 
+diff --git a/tests/unittests/test_log.py b/tests/unittests/test_log.py
+index a43fe41..3f1ea41 100755
+--- a/tests/unittests/test_log.py
++++ b/tests/unittests/test_log.py
+@@ -150,5 +150,14 @@ class PySimLogger_Test(unittest.TestCase):
+         PySimLogger.setup(self._test_print_callback, {logging.WARN: YELLOW})
+         log.warning(TEST_MSG_WARNING)                   # don't leak cmd2 Color StrEnum
+ 
++    def test_06_nested_loggers(self):
++        # the record also reaches the handlers of the parent loggers
++        printed = []
++        PySimLogger.setup(printed.append)
++        PySimLogger.get(__name__ + '.nested')
++        child = PySimLogger.get(__name__ + '.nested.child')
++        child.warning(TEST_MSG_WARNING)
++        self.assertEqual([m.strip() for m in printed], ["WARNING: " + TEST_MSG_WARNING])
++
+ if __name__ == '__main__':
+     unittest.main()

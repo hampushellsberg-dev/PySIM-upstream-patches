@@ -1,0 +1,69 @@
+diff --git a/pySim/esim/saip/__init__.py b/pySim/esim/saip/__init__.py
+index bec4d7a..b0f7d09 100644
+--- a/pySim/esim/saip/__init__.py
++++ b/pySim/esim/saip/__init__.py
+@@ -1152,11 +1152,14 @@ class SecurityDomainKeyComponent:
+ class SecurityDomainKey:
+     """Representation of a key used for SCP access to a security domain."""
+     def __init__(self, key_version_number: int, key_id: int, key_usage_qualifier: dict,
+-                 key_components: List[SecurityDomainKeyComponent]):
++                 key_components: List[SecurityDomainKeyComponent], key_access: int = 0,
++                 key_counter_value: Optional[bytes] = None):
+         self.key_usage_qualifier = key_usage_qualifier
+         self.key_identifier = key_id
+         self.key_version_number = key_version_number
+         self.key_components = key_components
++        self.key_access = key_access
++        self.key_counter_value = key_counter_value
+ 
+     def __repr__(self) -> str:
+         return 'SdKey(KVN=0x%02x, ID=0x%02x, Usage=0x%x, Comp=%s)' % (self.key_version_number,
+@@ -1170,15 +1173,23 @@ class SecurityDomainKey:
+         inst = cls(int.from_bytes(saip['keyVersionNumber'], "big"),
+                    int.from_bytes(saip['keyIdentifier'], "big"),
+                    KeyUsageQualifier.parse(saip['keyUsageQualifier']),
+-                   [SecurityDomainKeyComponent.from_saip_dict(x) for x in saip['keyComponents']])
++                   [SecurityDomainKeyComponent.from_saip_dict(x) for x in saip['keyComponents']],
++                   key_access=int.from_bytes(saip.get('keyAccess', b'\x00'), "big"),
++                   key_counter_value=saip.get('keyCounterValue', None))
+         return inst
+ 
+     def to_saip_dict(self) -> dict:
+         """Express instance in the dict format required by SAIP asn.1 encoder."""
+-        return {'keyUsageQualifier': KeyUsageQualifier.build(self.key_usage_qualifier),
+-                'keyIdentifier': bytes([self.key_identifier]),
+-                'keyVersionNumber': bytes([self.key_version_number]),
+-                'keyComponents': [k.to_saip_dict() for k in self.key_components]}
++        ret = {'keyUsageQualifier': KeyUsageQualifier.build(self.key_usage_qualifier),
++               'keyIdentifier': bytes([self.key_identifier]),
++               'keyVersionNumber': bytes([self.key_version_number]),
++               'keyComponents': [k.to_saip_dict() for k in self.key_components]}
++        # keyAccess is DEFAULT '00', keyCounterValue OPTIONAL
++        if self.key_access:
++            ret['keyAccess'] = bytes([self.key_access])
++        if self.key_counter_value is not None:
++            ret['keyCounterValue'] = self.key_counter_value
++        return ret
+ 
+     def get_key_component(self, key_type):
+         for kc in self.key_components:
+diff --git a/tests/unittests/test_esim_saip.py b/tests/unittests/test_esim_saip.py
+index e6f9882..2247d56 100755
+--- a/tests/unittests/test_esim_saip.py
++++ b/tests/unittests/test_esim_saip.py
+@@ -47,6 +47,15 @@ class SaipTest(unittest.TestCase):
+                 self.assertEqual(reenc_tlv, first_tlv)
+ 
+ 
++    def test_sd_key_access_and_counter(self):
++        """Test that keyAccess and keyCounterValue of a security domain key survive a re-encode."""
++        decoded = copy.deepcopy(self.pes.get_pe_for_type('securityDomain').decoded)
++        decoded['keyList'][0]['keyAccess'] = b'\x01'
++        decoded['keyList'][0]['keyCounterValue'] = b'\x00\x00\x01'
++        der = asn1.encode('ProfileElement', ('securityDomain', decoded))
++        pe = ProfileElement.from_der(der)
++        self.assertEqual(pe.to_der(), der)
++
+     def test_sequence_helpers(self):
+         """Verify that the convenience helpers worked as expected."""
+         self.assertEqual([x.type for x in self.pes.pe_list], self.expected_pet_list)

@@ -1,0 +1,61 @@
+== 2026-10-29: hampushellsberg-dev/pysim 7723a45 on top of 74f5002
+   esim.saip: split a fillFileOffset beyond the range of UInt16
+
+tests/unittests/test_esim_saip.py::FileContentTest.test_fill_file_offset_fits_uint16,
+one changed byte at offset 66000 of a 70000-byte transparent file:
+  without the fix: FAIL, offsets [66000]
+  with the fix:    OK, offsets [65535, 465], the tuples rebuild the body
+
+tests/unittests at 74f5002 (pySim CI invocation, file by file):
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.030s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.001s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.775s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.005s OK
+  OK   test_esim_rsp.py                         Ran 11 tests in 0.654s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.061s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.590s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.023s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 6 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2
+
+tests/unittests at 7723a45:
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.029s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.000s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.840s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.005s OK
+  OK   test_esim_rsp.py                         Ran 11 tests in 0.655s OK
+  OK   test_esim_saip.py                        Ran 12 tests in 0.074s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.580s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.023s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 6 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2

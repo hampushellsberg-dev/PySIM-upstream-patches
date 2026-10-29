@@ -1,0 +1,299 @@
+Validation of pysim-rsp-v3-module.patch, applied after pysim-rsp-v3-euiccinfo.patch, on
+hampushellsberg-dev/pysim f2db3ab (osmocom pySim master 9aa8934 + the series).
+Run 2026-10-29, Python 3.13, asn1tools 0.166.0.
+
+1. Transcription (transcribe_annex_h.py SGP.22-v3.1)
+
+wrote <scratch>/rsp_v3_from_script.asn: 1598 lines
+column-0 lines after a comment kept as lines of their own:
+  -- If revision is not used (e.g., v2.1), byte 3 SHALL be set to '00'.
+  -- #SupportedFromV3.0.0#
+  -- The new initial MAC chaining value
+  missingCrl(9), -- #SupportedFromV3.0.0#
+  invalidCrlSignature(10), -- #SupportedFromV3.0.0#
+  revokedCert(11), -- #SupportedFromV3.0.0#
+  invalidCertOrCrlTime(12), -- #SupportedFromV3.0.0#
+  invalidCertOrCrlConfiguration(13), -- #SupportedFromV3.0.0#
+  invalidIccid(14), -- #SupportedForDcV3.0.0#
+cmp with pySim/esim/asn1/rsp_v3/rsp.asn: identical
+
+Acceptance: compile with PKIX1Explicit88/PKIX1Implicit88 and PE_Definitions-3.3.1, then
+compare token by token with a comment-free extraction of the same pages:
+compiled: 195 RSPDefinitions types
+non-ASCII lines: []
+vs comment-free extraction -> added: [] removed: ['OPENTYPE'] changed: ['VendorSpecificExtension', 'AuthenticateErrorCode', 'CheckProgressOk']
+### VendorSpecificExtension
+   -  vendorOid [ 0 ] OPENTYPE . & typeId ,
+   -  vendorSpecificData [ 1 ] OPENTYPE . & Type
+   +  vendorOid [ 0 ] OBJECT IDENTIFIER ,
+   +  vendorSpecificData [ 1 ] ANY
+### AuthenticateErrorCode
+   +  missingCrl ( 9 ) ,
+   +  invalidCrlSignature ( 10 ) ,
+   +  revokedCert ( 11 ) ,
+   +  invalidCertOrCrlTime ( 12 ) ,
+   +  invalidCertOrCrlConfiguration ( 13 ) ,
+   +  invalidIccid ( 14 ) ,
+### CheckProgressOk
+   -} END
+   +}
+(CheckProgressOk: the extraction carried the module's END in its last assignment; no change.)
+(AuthenticateErrorCode: the comment-free extraction had read the six named numbers the
+ published text sets at column 0 as wrapped comment text; the transcription keeps them.)
+
+2. Repro, before and after
+
+== before: pinned hampushellsberg-dev/pysim f2db3ab (installed)
+pySim from <venv>/lib/python3.13/site-packages/pySim/__init__.py
+pySim.esim.rsp.asn1_v3: absent
+
+  MISSING EuiccConfiguredDataRequest     (BF tag 3C)
+  MISSING EuiccConfiguredDataResponse    (BF tag 3C)
+  MISSING LoadRpmPackageRequest          (BF tag 44)
+  MISSING LoadRpmPackageResult           (BF tag 44)
+  MISSING VerifySmdsResponseRequest      (BF tag 45)
+  MISSING VerifySmdsResponseResponse     (BF tag 45)
+  MISSING CheckEventRequest              (BF tag 46)
+  MISSING CheckEventResponse             (BF tag 46)
+  MISSING AlertData                      (BF tag 4A)
+  MISSING VerifyDeviceChangeRequest      (BF tag 4B)
+  MISSING VerifyDeviceChangeResponse     (BF tag 4B)
+  MISSING ConfirmDeviceChangeRequest     (BF tag 4C)
+  MISSING ConfirmDeviceChangeResponse    (BF tag 4C)
+  MISSING PrepareDeviceChangeRequest     (BF tag 4D)
+  MISSING PrepareDeviceChangeResponse    (BF tag 4D)
+  MISSING VerifySmdpResponseRequest      (BF tag 60)
+  MISSING VerifySmdpResponseResponse     (BF tag 60)
+  MISSING CheckProgressRequest           (BF tag 61)
+  MISSING CheckProgressResponse          (BF tag 61)
+  MISSING VerifyProfileRecoveryRequest   (BF tag 62)
+  MISSING VerifyProfileRecoveryResponse  (BF tag 62)
+  MISSING DeleteNotificationForDc        (BF tag 63)
+
+FAIL: 22 of 22 BF-tagged SGP.22 v3.1 types unavailable.
+exit=1
+
+== after: f2db3ab + pysim-rsp-v3-euiccinfo.patch + pysim-rsp-v3-module.patch
+pySim from <scratch>/pysim/pySim/__init__.py
+pySim.esim.rsp.asn1_v3: present
+
+  OK      EuiccConfiguredDataRequest     BF3C   3 bytes
+  OK      EuiccConfiguredDataResponse    BF3C  21 bytes
+  OK      LoadRpmPackageRequest          BF44 100 bytes
+  OK      LoadRpmPackageResult           BF44  18 bytes
+  OK      VerifySmdsResponseRequest      BF45  84 bytes
+  OK      VerifySmdsResponseResponse     BF45   5 bytes
+  OK      CheckEventRequest              BF46  39 bytes
+  OK      CheckEventResponse             BF46   8 bytes
+  OK      AlertData                      BF4A   7 bytes
+  OK      VerifyDeviceChangeRequest      BF4B 122 bytes
+  OK      VerifyDeviceChangeResponse     BF4B   6 bytes
+  OK      ConfirmDeviceChangeRequest     BF4C  31 bytes
+  OK      ConfirmDeviceChangeResponse    BF4C   6 bytes
+  OK      PrepareDeviceChangeRequest     BF4D  85 bytes
+  OK      PrepareDeviceChangeResponse    BF4D  18 bytes
+  OK      VerifySmdpResponseRequest      BF60  90 bytes
+  OK      VerifySmdpResponseResponse     BF60   5 bytes
+  OK      CheckProgressRequest           BF61   7 bytes
+  OK      CheckProgressResponse          BF61   8 bytes
+  OK      VerifyProfileRecoveryRequest   BF62  85 bytes
+  OK      VerifyProfileRecoveryResponse  BF62   5 bytes
+  OK      DeleteNotificationForDc        BF63 108 bytes
+
+Same bytes, different meaning per version:
+  DeviceCapabilities 30058803020000: v2 {'rspRpmSupportedVersion': b'\x02\x00\x00'} / v3.1 {'nrEpcSupportedRelease': b'\x02\x00\x00'}
+  ProfileInstallationResultData without smdpOid: v2 decodes / v3.1 MissingMandatoryFieldError
+
+PASS: all 22 BF-tagged SGP.22 v3.1 types encode and decode.
+exit=0
+
+3. pySim unit tests, every tests/unittests file, run as pySim's CI does
+   test_log and test_smpp_ota_tool fail identically on the unpatched tree.
+
+-- unpatched f2db3ab
+pySim resolved from: <scratch>/pysim-pristine/pySim/__init__.py
+test_apdu.py                             rc=0 Ran 6 tests | OK
+test_bip_relay.py                        rc=0 Ran 18 tests | OK
+test_card_key_provider.py                rc=0 Ran 4 tests | OK
+test_cat.py                              rc=0 Ran 11 tests | OK
+test_configurable_parameters.py          rc=0 Ran 40 tests | OK
+test_decode_select_resp.py               rc=0 Ran 2 tests | OK
+test_esim.py                             rc=0 Ran 2 tests | OK
+test_esim_bsp.py                         rc=0 Ran 4 tests | OK
+test_esim_saip.py                        rc=0 Ran 11 tests | OK
+test_euicc.py                            rc=0 Ran 5 tests | OK
+test_files.py                            rc=0 Ran 12 tests | OK
+test_fs_coverage.py                      rc=0 Ran 1 test | OK
+test_globalplatform.py                   rc=0 Ran 107 tests | OK
+test_javacard.py                         rc=0 Ran 1 test | OK
+test_log.py                              rc=1 Ran 5 tests | FAILED (failures=1)
+test_ota.py                              rc=0 Ran 38 tests | OK
+test_param_src.py                        rc=0 Ran 1 test | OK
+test_smpp_ota_tool.py                    rc=1 Ran 1 test | FAILED (errors=1)
+test_sms.py                              rc=0 Ran 23 tests | OK
+test_tlvs.py                             rc=0 Ran 3 tests | OK
+test_transport.py                        rc=0 Ran 23 tests | OK
+test_utils.py                            rc=0 Ran 34 tests | OK
+
+-- with both patches
+pySim resolved from: <scratch>/pysim/pySim/__init__.py
+test_apdu.py                             rc=0 Ran 6 tests | OK
+test_bip_relay.py                        rc=0 Ran 18 tests | OK
+test_card_key_provider.py                rc=0 Ran 4 tests | OK
+test_cat.py                              rc=0 Ran 11 tests | OK
+test_configurable_parameters.py          rc=0 Ran 40 tests | OK
+test_decode_select_resp.py               rc=0 Ran 2 tests | OK
+test_esim.py                             rc=0 Ran 2 tests | OK
+test_esim_bsp.py                         rc=0 Ran 4 tests | OK
+test_esim_rsp.py                         rc=0 Ran 9 tests | OK
+test_esim_saip.py                        rc=0 Ran 11 tests | OK
+test_euicc.py                            rc=0 Ran 5 tests | OK
+test_files.py                            rc=0 Ran 12 tests | OK
+test_fs_coverage.py                      rc=0 Ran 1 test | OK
+test_globalplatform.py                   rc=0 Ran 107 tests | OK
+test_javacard.py                         rc=0 Ran 1 test | OK
+test_log.py                              rc=1 Ran 5 tests | FAILED (failures=1)
+test_ota.py                              rc=0 Ran 38 tests | OK
+test_param_src.py                        rc=0 Ran 1 test | OK
+test_smpp_ota_tool.py                    rc=1 Ran 1 test | FAILED (errors=1)
+test_sms.py                              rc=0 Ran 23 tests | OK
+test_tlvs.py                             rc=0 Ran 3 tests | OK
+test_transport.py                        rc=0 Ran 23 tests | OK
+test_utils.py                            rc=0 Ran 34 tests | OK
+
+4. Packaging: pip wheel --no-deps of the patched tree
+   pySim/esim/asn1/rsp/PKIX1Explicit88.asn
+   pySim/esim/asn1/rsp/PKIX1Implicit88.asn
+   pySim/esim/asn1/rsp/rsp.asn
+   pySim/esim/asn1/rsp_v3/rsp.asn
+   pySim/esim/asn1/saip/PE_Definitions-3.3.1.asn
+   Imported from the unpacked wheel, outside the tree:
+   asn1_v3().encode('CheckProgressRequest', {'dcSessionId': b''}) -> bf6103800101
+
+5. Both patches applied with git apply, in order, to a fresh clone of f2db3ab: the tree
+   is identical to the tested one (diff -r, .git and build output excluded).
+
+== 2026-10-29: hampushellsberg-dev/pysim 3fd51ec on top of d5b3266
+   esim/asn1: add the SGP.22 v3.1 RSPDefinitions module as rsp_v3
+
+repro at 3fd51ec:
+  
+  Same bytes, different meaning per version:
+    DeviceCapabilities 30058803020000: v2 {'rspRpmSupportedVersion': b'\x02\x00\x00'} / v3.1 {'nrEpcSupportedRelease': b'\x02\x00\x00'}
+    ProfileInstallationResultData without smdpOid: v2 decodes / v3.1 MissingMandatoryFieldError
+  
+  PASS: all 22 BF-tagged SGP.22 v3.1 types encode and decode.
+
+tests/unittests at d5b3266 (pySim CI invocation, file by file):
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.030s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.001s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.794s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.005s OK
+  OK   test_esim_rsp.py                         Ran 3 tests in 0.000s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.062s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.582s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.024s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 5 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2
+
+tests/unittests at 3fd51ec:
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.030s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.000s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.803s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.006s OK
+  OK   test_esim_rsp.py                         Ran 9 tests in 0.416s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.062s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.572s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.025s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 5 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2
+
+== 2026-10-29: independent check against the PDF (check_against_pdf.py)
+   pdftotext -f 437 -l 462 -layout SGP.22-v3.1.pdf annexh.txt (poppler; footer "SGP.22 v3.1 Page 437 of 501")
+   python check_against_pdf.py pySim/esim/asn1/rsp_v3/rsp.asn annexh.txt
+
+== code and version markers: module 7135 tokens, PDF 7816 tokens
+  insert after ..., gid1 OCTET STRING OPTIONAL ,
+    PDF:    '6F3E' ) in 3GPP TS 31.102 [ 54 ]
+  insert after ...OPTIONAL , gid2 OCTET STRING OPTIONAL
+    PDF:    '6F3F' ) in 3GPP TS 31.102 [ 54 ]
+  insert after ...1 ] INTEGER } OPTIONAL }
+    PDF:    OPENTYPE ::= CLASS { &typeId OBJECT IDENTIFIER , &Type }
+  replace after ...{ #SupportedFromV2.4.0# vendorOid [ 0 ]
+    module: OBJECT IDENTIFIER
+    PDF:    OPENTYPE.&typeId
+  replace after ...IDENTIFIER , vendorSpecificData [ 1 ]
+    module: ANY
+    PDF:    OPENTYPE.&Type
+  insert after ...) ) , ppiResponse OCTET STRING
+    PDF:    Package Interpreter as defined in [ 5 ]
+  insert after ...ErrorReason , ppiResponse OCTET STRING OPTIONAL
+    PDF:    Profile Package Interpreter as defined in [ 5 ]
+  insert after ...[ 14 ] UTF8String OPTIONAL ,
+    PDF:    GlobalPlatform DLOA specification [ 57 ]
+  insert after ...::= SEQUENCE { platformLabel UTF8String ,
+    PDF:    DLOA specification [ 57 ]
+  insert after ...{ platformLabel UTF8String , discoveryBaseURL UTF8String
+    PDF:    Registrar as defined in GlobalPlatform DLOA specification [ 57 ]
+  insert after ...[ 6 ] IMPLICIT ControlRefTemplate ,
+    PDF:    ( Key Agreement ) . Current specification considers a subset of CRT specified in GlobalPlatform Card Specification Amendment F [ 13 ] section 6.5.2.3 for the Mutual Authentication Data Field
+  insert after ...APPLICATION 73 ] OCTET STRING ,
+    PDF:    GlobalPlatform Card Specification Amendment F [ 13 ] section 6.5.2.3 for ePK.OCE.KA , tag '5F49'
+  insert after ...keyType [ 0 ] Octet1 ,
+    PDF:    [ 8 ] Table 11-16 , Tag '80'
+  insert after ...SIZE ( 0..64 ) ) ,
+    PDF:    Description' defined in SGP.21 [ 2 ] )
+  (114 insertions of wrapped comment prose not shown)
+  14 differences shown
+== full text: module 9585 tokens, PDF 9495 tokens
+  delete after ...
+    module: GSMA SGP.22 v3.1 , Annex H "ASN.1 Definitions ( Normative ) " , transcribed from the published specification. Comments the PDF wrapped onto a second line are rejoined ; the one change to the definitio
+  delete after ...can be Enabled } OPTIONAL }
+    module: The published module declares
+  delete after ...&typeId OBJECT IDENTIFIER , &Type }
+    module: and types the two fields of VendorSpecificExtension as OPENTYPE.&typeId and OPENTYPE.&Type. asn1tools cannot resolve an information object class , so they are OBJECT IDENTIFIER and ANY here , which en
+  replace after ...{ #SupportedFromV2.4.0# vendorOid [ 0 ]
+    module: OBJECT IDENTIFIER
+    PDF:    OPENTYPE.&typeId
+  delete after ...[ 0 ] OBJECT IDENTIFIER ,
+    module: OPENTYPE.&typeId in the published module ;
+  delete after ...specific extension vendorSpecificData [ 1 ]
+    module: ANY
+  delete after ...vendorSpecificData [ 1 ] ANY OPENTYPE.&Type
+    module: in the published module
+  7 differences shown
+
+Code: the three OPENTYPE items are the documented replacement; the other eleven are
+comment text the PDF wrapped onto a line of its own (they carry a reference such as [57]).
+Full text: the seven differences are the OPENTYPE replacement and the transcription notes.
+Version markers per kind (17 kinds, 225 in all) occur as often in the module as in the PDF.

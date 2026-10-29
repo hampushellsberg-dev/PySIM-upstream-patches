@@ -76,6 +76,8 @@ and advance `cur` to the end of each block written.
 
 ## YggdraSIM-side compensation
 
+Retired on 2026-10-23: YggdraSIM pins hampushellsberg-dev/pysim, upstream master with this fix on top, and no longer carries what this section describes. The one gap the pinned pySim still had, offsets beyond UInt16, is fixed below.
+
 `Tools/ProfilePackage/saip_pysim_compat.py::install_body_encoding_against_creation_content`
 wraps `File.file_content_to_tuples`. It calls upstream first and replays the
 result onto the content the card creates the file with (the Fcp pattern, else
@@ -98,3 +100,43 @@ workbench's body editors (`saip.update_file_content`,
 - [x] Unoptimised calls and generic-file-management files (written verbatim) are unchanged.
 - [x] An offset beyond the UInt16 range of `fillFileOffset` is split into several.
 - [ ] Upstream merge request.
+
+## An offset beyond UInt16
+
+TCA SAIP V3.4.1 §8.3.2 types `fillFileOffset` as UInt16, and §8.3.5 moves the
+pointer from where it stands, so a longer move is the same move made in
+several steps. With `0001-...` applied (hampushellsberg-dev/pysim `f2db3ab`),
+`file_content_to_tuples(optimize=True)` still emits a gap as one offset: one
+changed byte at offset 66000 of a 70000-byte transparent file encodes as
+
+```
+offsets: [66000] | content bytes: 4000 | rebuilds: True
+```
+
+an INTEGER outside the type, which the DER encoder writes without complaint.
+(The 4000 content bytes are the changed byte and the 'FF' tail behind it:
+`SequenceMatcher` treats the frequent 'FF' byte as junk and finds no match
+after the difference. That costs size, not correctness.)
+
+`0002-saip-split-fill-file-offset-beyond-uint16.patch`, against `f2db3ab`,
+makes the move in steps of at most 0xFFFF:
+
+```
+offsets: [65535, 465] | content bytes: 4000 | rebuilds: True
+```
+
+YggdraSIM side: `install_fill_file_offset_split` in
+`Tools/ProfilePackage/saip_pysim_compat.py` splits the offsets pySim returns,
+checks that every `fillFileContent` still lands where pySim put it, and is a
+no-op once pySim splits them itself;
+`tests/test_saip_pysim_compat.py::BodyEncodingAgainstCreationContentTests`
+pins the gap (`test_upstream_still_emits_an_offset_beyond_uint16`).
+
+The YggdraSIM compensation retired on 2026-10-23 split the offset too, but only
+on its own path: it replaced pySim's encoding when that did not rebuild the
+body, which the pinned pySim now always does.
+
+On hampushellsberg-dev/pysim as `7723a45` (2026-10-29, `esim.saip: split a
+fillFileOffset beyond the range of UInt16`), with
+`FileContentTest.test_fill_file_offset_fits_uint16` in
+`tests/unittests/test_esim_saip.py`; `validation.txt` has the runs.

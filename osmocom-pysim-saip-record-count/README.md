@@ -57,6 +57,8 @@ keeps both records (84 bytes) with record 2 unchanged.
 
 ## YggdraSIM-side compensation
 
+Retired on 2026-10-23: YggdraSIM pins hampushellsberg-dev/pysim, upstream master with this fix on top, and no longer carries what this section describes. `repro_record_count.py` no longer prints the compensation.
+
 `yggdrasim_common/gui_server/actions/saip.py::_record_count_from_declared_size`
 returns the largest of the template count, the declared size and the body,
 so the file view lists every record. It states its result and becomes a

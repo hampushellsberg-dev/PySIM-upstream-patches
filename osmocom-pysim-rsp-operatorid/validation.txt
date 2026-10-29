@@ -1,0 +1,143 @@
+Validation of pysim-rsp-operatorid.patch, applied after pysim-rsp-v3-euiccinfo.patch and
+pysim-rsp-v3-module.patch, on hampushellsberg-dev/pysim f2db3ab. Run 2026-10-29, Python 3.13,
+asn1tools 0.166.0.
+
+1. Repro, before and after (the second compile is the published SGP.32 v1.3 module,
+   docs/tel-docs/converted/_assets/SGP.32-v1.3/SGP.32-v1.3.asn1 of the specification library)
+
+== before: pinned hampushellsberg-dev/pysim f2db3ab (installed)
+pySim from <venv>/lib/python3.13/site-packages/pySim/__init__.py
+  FAIL minimal importer of OperatorId: CompileError: Type 'OperatorId' imported by module 'Importer' not found in module 'RSPDefinitions'.
+  FAIL SGP.32 v1.3 module: CompileError: Type 'OperatorId' imported by module 'SGP32Definitions' not found in module 'RSPDefinitions'.
+
+FAIL: pySim's RSPDefinitions declares OperatorID, not OperatorId.
+exit=1
+
+== after: f2db3ab + the three patches (local clone)
+pySim from <pysim>/pySim/__init__.py
+  OK   minimal importer of OperatorId: modules ['Importer', 'PKIX1Explicit88', 'PKIX1Implicit88', 'RSPDefinitions']
+  OK   SGP.32 v1.3 module: modules ['PKIX1Explicit88', 'PKIX1Implicit88', 'RSPDefinitions', 'SGP32Definitions']
+
+PASS: OperatorId resolves in pySim's RSPDefinitions.
+exit=0
+
+2. pySim unit tests, every tests/unittests file, run as pySim's CI does
+   test_log and test_smpp_ota_tool fail identically on the unpatched tree.
+
+-- unpatched f2db3ab
+pySim resolved from: <scratch>/pysim-pristine/pySim/__init__.py
+test_apdu.py                             rc=0 Ran 6 tests | OK
+test_bip_relay.py                        rc=0 Ran 18 tests | OK
+test_card_key_provider.py                rc=0 Ran 4 tests | OK
+test_cat.py                              rc=0 Ran 11 tests | OK
+test_configurable_parameters.py          rc=0 Ran 40 tests | OK
+test_decode_select_resp.py               rc=0 Ran 2 tests | OK
+test_esim.py                             rc=0 Ran 2 tests | OK
+test_esim_bsp.py                         rc=0 Ran 4 tests | OK
+test_esim_saip.py                        rc=0 Ran 11 tests | OK
+test_euicc.py                            rc=0 Ran 5 tests | OK
+test_files.py                            rc=0 Ran 12 tests | OK
+test_fs_coverage.py                      rc=0 Ran 1 test | OK
+test_globalplatform.py                   rc=0 Ran 107 tests | OK
+test_javacard.py                         rc=0 Ran 1 test | OK
+test_log.py                              rc=1 Ran 5 tests | FAILED (failures=1)
+test_ota.py                              rc=0 Ran 38 tests | OK
+test_param_src.py                        rc=0 Ran 1 test | OK
+test_smpp_ota_tool.py                    rc=1 Ran 1 test | FAILED (errors=1)
+test_sms.py                              rc=0 Ran 23 tests | OK
+test_tlvs.py                             rc=0 Ran 3 tests | OK
+test_transport.py                        rc=0 Ran 23 tests | OK
+test_utils.py                            rc=0 Ran 34 tests | OK
+
+-- with the three patches
+pySim resolved from: <pysim>/pySim/__init__.py
+test_apdu.py                             rc=0 Ran 6 tests | OK
+test_bip_relay.py                        rc=0 Ran 18 tests | OK
+test_card_key_provider.py                rc=0 Ran 4 tests | OK
+test_cat.py                              rc=0 Ran 11 tests | OK
+test_configurable_parameters.py          rc=0 Ran 40 tests | OK
+test_decode_select_resp.py               rc=0 Ran 2 tests | OK
+test_esim.py                             rc=0 Ran 2 tests | OK
+test_esim_bsp.py                         rc=0 Ran 4 tests | OK
+test_esim_rsp.py                         rc=0 Ran 11 tests | OK
+test_esim_saip.py                        rc=0 Ran 11 tests | OK
+test_euicc.py                            rc=0 Ran 5 tests | OK
+test_files.py                            rc=0 Ran 12 tests | OK
+test_fs_coverage.py                      rc=0 Ran 1 test | OK
+test_globalplatform.py                   rc=0 Ran 107 tests | OK
+test_javacard.py                         rc=0 Ran 1 test | OK
+test_log.py                              rc=1 Ran 5 tests | FAILED (failures=1)
+test_ota.py                              rc=0 Ran 38 tests | OK
+test_param_src.py                        rc=0 Ran 1 test | OK
+test_smpp_ota_tool.py                    rc=1 Ran 1 test | FAILED (errors=1)
+test_sms.py                              rc=0 Ran 23 tests | OK
+test_tlvs.py                             rc=0 Ran 3 tests | OK
+test_transport.py                        rc=0 Ran 23 tests | OK
+test_utils.py                            rc=0 Ran 34 tests | OK
+
+3. The three patches applied with git apply, in order, to a fresh clone of f2db3ab
+   reproduce the tested tree; no whitespace warnings.
+
+== 2026-10-29: hampushellsberg-dev/pysim adf97af on top of 3fd51ec
+   esim/asn1/rsp: add OperatorId as an alias of OperatorID
+
+repro at adf97af:
+  pySim from <pysim>/pySim/__init__.py
+    OK   minimal importer of OperatorId: modules ['Importer', 'PKIX1Explicit88', 'PKIX1Implicit88', 'RSPDefinitions']
+    OK   SGP.32 v1.3 module: modules ['PKIX1Explicit88', 'PKIX1Implicit88', 'RSPDefinitions', 'SGP32Definitions']
+  
+  PASS: OperatorId resolves in pySim's RSPDefinitions.
+
+tests/unittests at 3fd51ec (pySim CI invocation, file by file):
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.030s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.000s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.803s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.006s OK
+  OK   test_esim_rsp.py                         Ran 9 tests in 0.416s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.062s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.018s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.572s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.025s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 5 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.001s OK
+  files failing: 2
+
+tests/unittests at adf97af:
+  compileall: OK
+  OK   test_apdu.py                             Ran 6 tests in 0.000s OK
+  OK   test_bip_relay.py                        Ran 18 tests in 0.029s OK
+  OK   test_card_key_provider.py                Ran 4 tests in 0.003s OK
+  OK   test_cat.py                              Ran 11 tests in 0.000s OK
+  OK   test_configurable_parameters.py          Ran 40 tests in 9.740s OK
+  OK   test_decode_select_resp.py               Ran 2 tests in 0.001s OK
+  OK   test_esim.py                             Ran 2 tests in 0.001s OK
+  OK   test_esim_bsp.py                         Ran 4 tests in 0.005s OK
+  OK   test_esim_rsp.py                         Ran 11 tests in 0.645s OK
+  OK   test_esim_saip.py                        Ran 11 tests in 0.061s OK
+  OK   test_euicc.py                            Ran 5 tests in 0.000s OK
+  OK   test_files.py                            Ran 12 tests in 0.019s OK
+  OK   test_fs_coverage.py                      Ran 1 test in 0.575s <sys>:0: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+  OK   test_globalplatform.py                   Ran 107 tests in 0.023s OK
+  OK   test_javacard.py                         Ran 1 test in 0.000s OK
+  FAIL test_log.py                              Ran 5 tests in 0.004s FAILED (failures=1)
+  OK   test_ota.py                              Ran 38 tests in 0.007s OK
+  OK   test_param_src.py                        Ran 1 test in 0.001s OK
+  FAIL test_smpp_ota_tool.py                    Ran 1 test in 0.000s FAILED (errors=1)
+  OK   test_sms.py                              Ran 23 tests in 0.002s OK
+  OK   test_tlvs.py                             Ran 3 tests in 0.003s OK
+  OK   test_transport.py                        Ran 23 tests in 0.002s OK
+  OK   test_utils.py                            Ran 34 tests in 0.002s OK
+  files failing: 2
